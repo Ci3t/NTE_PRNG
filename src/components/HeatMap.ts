@@ -1,4 +1,4 @@
-import { type StatKey, type SecondOption, type DateFilter, SECOND_OPTIONS, STAT_LABELS, DATE_FILTER_OPTIONS } from '../types.ts'
+import { type StatKey, type SecondOption, type DateFilter, type ServerRegion, SECOND_OPTIONS, STAT_LABELS, DATE_FILTER_OPTIONS, SERVER_FILTER_OPTIONS } from '../types.ts'
 import { fetchAllPulls, normalizeError } from '../db.ts'
 import type { PullRow } from '../types.ts'
 
@@ -11,6 +11,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   let selectedStats = new Set<StatKey>()
   let hourFilter: 'all' | 'current' | -1 | -2 = 'all'
   let dateFilter: DateFilter = 'all'
+  let serverFilter: ServerRegion | 'all' = 'all'
   let allPulls: PullRow[] = []
   let refreshTimer: number | null = null
 
@@ -128,6 +129,31 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
   wrap.appendChild(dateFilterRow)
 
+  // Server filter
+  const serverFilterRow = document.createElement('div')
+  serverFilterRow.className = 'flex items-center gap-2 flex-wrap mb-2'
+
+  const serverFilterLabel = document.createElement('span')
+  serverFilterLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
+  serverFilterLabel.textContent = 'Server'
+  serverFilterRow.appendChild(serverFilterLabel)
+
+  const serverButtons = new Map<string, HTMLButtonElement>()
+  for (const opt of SERVER_FILTER_OPTIONS) {
+    const btn = document.createElement('button')
+    btn.className = 'bg-surface-raised border border-border rounded px-1.5 py-0.5 text-[0.7rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text'
+    btn.type = 'button'
+    btn.textContent = opt.label
+    btn.addEventListener('click', () => {
+      serverFilter = opt.value
+      refreshServerButtons()
+      load(true)
+    })
+    serverButtons.set(opt.value, btn)
+    serverFilterRow.appendChild(btn)
+  }
+  wrap.appendChild(serverFilterRow)
+
   // Grid
   const grid = document.createElement('div')
   grid.className = 'grid grid-cols-4 md:grid-cols-6 gap-2'
@@ -177,6 +203,23 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   refreshHourButtons()
   refreshDateButtons()
+  refreshServerButtons()
+
+  function refreshServerButtons() {
+    for (const [value, btn] of serverButtons.entries()) {
+      const active = serverFilter === value
+      btn.classList.toggle('bg-gradient-to-br', active)
+      btn.classList.toggle('from-purple', active)
+      btn.classList.toggle('to-purple-dim', active)
+      btn.classList.toggle('text-white', active)
+      btn.classList.toggle('border-purple-bright', active)
+      btn.classList.toggle('shadow-lg', active)
+      btn.classList.toggle('shadow-purple/15', active)
+      btn.classList.toggle('bg-surface-raised', !active)
+      btn.classList.toggle('border-border', !active)
+      btn.classList.toggle('text-text-muted', !active)
+    }
+  }
 
   function refreshStatFilterButtons() {
     for (const [key, btn] of statFilterButtons.entries()) {
@@ -342,18 +385,19 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     } else {
       const filteredCount = allPulls.filter(matchesHourFilter).length
       const dateLabel = DATE_FILTER_OPTIONS.find(d => d.value === dateFilter)?.label ?? 'All'
+      const serverLabel = SERVER_FILTER_OPTIONS.find(s => s.value === serverFilter)?.label ?? 'All Servers'
       if (hasStats) {
         const statNames = Array.from(selectedStats).map(s => STAT_LABELS[s]).join(' + ')
-        statusText.textContent = `${dateLabel} • ${statNames} rate • ${filteredCount} pulls`
+        statusText.textContent = `${serverLabel} • ${dateLabel} • ${statNames} rate • ${filteredCount} pulls`
       } else {
-        statusText.textContent = `${dateLabel} • Volume • ${filteredCount} pulls in window`
+        statusText.textContent = `${serverLabel} • ${dateLabel} • Volume • ${filteredCount} pulls in window`
       }
     }
   }
 
   async function load(force = false) {
     try {
-      allPulls = await fetchAllPulls(dateFilter, 2000, force)
+      allPulls = await fetchAllPulls(dateFilter, serverFilter, 2000, force)
       render()
     } catch (err) {
       const msg = normalizeError(err)

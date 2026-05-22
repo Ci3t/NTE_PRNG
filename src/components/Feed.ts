@@ -1,5 +1,5 @@
-import { type PullRow, type SecondOption, type StatKey, STAT_LABELS, HIGH_VALUE_STATS } from '../types.ts'
-import { getUserTag } from '../session.ts'
+import { type PullRow, type SecondOption, type StatKey, type ServerRegion, STAT_LABELS, HIGH_VALUE_STATS, SERVER_FILTER_OPTIONS } from '../types.ts'
+import { getUserTag, getServerRegion } from '../session.ts'
 import { fetchRecentPulls, normalizeError } from '../db.ts'
 
 function timeAgo(iso: string): string {
@@ -51,6 +51,7 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
   let pulls: PullRow[] = []
   let secondFilter: SecondOption | null = null
   let myPullsOnly = false
+  let serverFilter: ServerRegion | 'all' = getServerRegion()
   const myTag = getUserTag()
 
   const wrap = document.createElement('div')
@@ -79,6 +80,31 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
 
   wrap.appendChild(header)
 
+  // Server filter row
+  const serverFilterRow = document.createElement('div')
+  serverFilterRow.className = 'flex items-center gap-1.5 flex-wrap mb-2'
+
+  const serverFilterLabel = document.createElement('span')
+  serverFilterLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
+  serverFilterLabel.textContent = 'Srv'
+  serverFilterRow.appendChild(serverFilterLabel)
+
+  const serverButtons = new Map<string, HTMLButtonElement>()
+  for (const opt of SERVER_FILTER_OPTIONS) {
+    const btn = document.createElement('button')
+    btn.className = 'bg-surface-raised border border-border rounded px-1.5 py-0.5 text-[0.65rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text'
+    btn.type = 'button'
+    btn.textContent = opt.label
+    btn.addEventListener('click', () => {
+      serverFilter = opt.value
+      refreshServerButtons()
+      load(true)
+    })
+    serverButtons.set(opt.value, btn)
+    serverFilterRow.appendChild(btn)
+  }
+  wrap.appendChild(serverFilterRow)
+
   const list = document.createElement('div')
   list.className = 'flex flex-col gap-2 flex-1 overflow-y-auto pr-1 scrollbar-thin'
   wrap.appendChild(list)
@@ -90,6 +116,24 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
       list.removeChild(list.firstChild)
     }
   }
+
+  function refreshServerButtons() {
+    for (const [value, btn] of serverButtons.entries()) {
+      const active = serverFilter === value
+      btn.classList.toggle('bg-gradient-to-br', active)
+      btn.classList.toggle('from-purple', active)
+      btn.classList.toggle('to-purple-dim', active)
+      btn.classList.toggle('text-white', active)
+      btn.classList.toggle('border-purple-bright', active)
+      btn.classList.toggle('shadow-lg', active)
+      btn.classList.toggle('shadow-purple/15', active)
+      btn.classList.toggle('bg-surface-raised', !active)
+      btn.classList.toggle('border-border', !active)
+      btn.classList.toggle('text-text-muted', !active)
+    }
+  }
+
+  refreshServerButtons()
 
   function statPillClass(key: StatKey): string {
     if (key === 'has_crit_rate' || key === 'has_crit_dmg') return 'bg-gold/10 text-gold-bright border-gold-dim'
@@ -149,6 +193,16 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
       const meta = document.createElement('div')
       meta.className = 'flex items-center gap-1.5 flex-wrap'
 
+      if (row.server_region) {
+        const serverPill = document.createElement('span')
+        const serverColor = row.server_region === 'EU' ? 'bg-blue-500/10 text-blue-300' :
+                            row.server_region === 'NA' ? 'bg-red-500/10 text-red-300' :
+                            'bg-orange-500/10 text-orange-300'
+        serverPill.className = `inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold border border-transparent ${serverColor}`
+        serverPill.textContent = row.server_region
+        meta.appendChild(serverPill)
+      }
+
       const sourcePill = document.createElement('span')
       const sourceClass = row.time_source === 'auto' ? 'bg-blue-500/10 text-blue-300' : 'bg-gold/10 text-gold-bright'
       sourcePill.className = `inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold border border-transparent ${sourceClass}`
@@ -187,7 +241,7 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
 
   async function load(force = false) {
     try {
-      pulls = await fetchRecentPulls(25, force)
+      pulls = await fetchRecentPulls(serverFilter, 25, force)
       renderList()
     } catch (err) {
       clearList()

@@ -2,10 +2,12 @@ import {
   type PullInsertPayload,
   type StatKey,
   type SecondOption,
+  type ServerRegion,
   SECOND_OPTIONS,
   STAT_LABELS,
+  SERVER_OPTIONS,
 } from '../types.ts'
-import { getUserTag, setUserTag, getSessionId } from '../session.ts'
+import { getUserTag, setUserTag, getSessionId, getServerRegion, setServerRegion } from '../session.ts'
 import { insertPull, normalizeError } from '../db.ts'
 
 function pad2(n: number): string {
@@ -111,6 +113,21 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
     clearError()
   })
   formEl.appendChild(tagInput)
+
+  // Server select
+  const serverSelect = document.createElement('select')
+  serverSelect.className = 'appearance-none bg-surface-raised border border-border rounded text-text px-3 py-2 text-sm w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
+  for (const srv of SERVER_OPTIONS) {
+    const opt = document.createElement('option')
+    opt.value = srv
+    opt.textContent = `Server: ${srv}`
+    serverSelect.appendChild(opt)
+  }
+  serverSelect.value = getServerRegion()
+  serverSelect.addEventListener('change', () => {
+    setServerRegion(serverSelect.value as ServerRegion)
+  })
+  formEl.appendChild(serverSelect)
 
   // Time display
   const timeDisplay = document.createElement('div')
@@ -387,6 +404,7 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
     const payload: PullInsertPayload = {
       user_tag: userTag,
       session_id: getSessionId(),
+      server_region: serverSelect.value as ServerRegion,
       pull_hour: state.hour,
       pull_minute: state.minute,
       pull_second: state.second,

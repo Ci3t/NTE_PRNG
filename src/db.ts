@@ -4,6 +4,7 @@ import type {
   PullRow,
   SecondStatsRow,
   DateFilter,
+  ServerRegion,
 } from './types.ts'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -107,6 +108,7 @@ const canFetchStats = makeRateLimiter(15000)
 
 export async function fetchAllPulls(
   dateFilter: DateFilter = 'all',
+  serverRegion: ServerRegion | 'all' = 'all',
   limit = 2000,
   force = false
 ): Promise<PullRow[]> {
@@ -123,6 +125,10 @@ export async function fetchAllPulls(
   const range = getDateRange(dateFilter)
   if (range) {
     query = query.gte('logged_client_at', range.start).lt('logged_client_at', range.end)
+  }
+
+  if (serverRegion !== 'all') {
+    query = query.eq('server_region', serverRegion)
   }
 
   const { data, error } = await query.returns<PullRow[]>()
@@ -147,17 +153,26 @@ export async function fetchSecondStats(force = false): Promise<SecondStatsRow[]>
   return data ?? []
 }
 
-export async function fetchRecentPulls(limit = 50, force = false): Promise<PullRow[]> {
+export async function fetchRecentPulls(
+  serverRegion: ServerRegion | 'all' = 'all',
+  limit = 50,
+  force = false
+): Promise<PullRow[]> {
   if (!force && !canFetchRecent()) {
     throw new Error('Please wait a moment before refreshing.')
   }
   const supabase = getSupabaseClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('nte_pulls')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
-    .returns<PullRow[]>()
+
+  if (serverRegion !== 'all') {
+    query = query.eq('server_region', serverRegion)
+  }
+
+  const { data, error } = await query.returns<PullRow[]>()
   if (error) {
     throw new Error(error.message)
   }

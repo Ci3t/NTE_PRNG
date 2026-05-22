@@ -50,9 +50,21 @@ export const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
   { value: 'last7', label: '7d' },
 ]
 
+export type ServerRegion = 'EU' | 'NA' | 'Asia'
+
+export const SERVER_OPTIONS: ServerRegion[] = ['EU', 'NA', 'Asia']
+
+export const SERVER_FILTER_OPTIONS: { value: ServerRegion | 'all'; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'EU', label: 'EU' },
+  { value: 'NA', label: 'NA' },
+  { value: 'Asia', label: 'Asia' },
+]
+
 export interface PullInsertPayload {
   user_tag: string
   session_id: string
+  server_region: ServerRegion
   pull_hour: number
   pull_minute: number
   pull_second: SecondOption
@@ -78,6 +90,7 @@ export interface PullRow {
   id: string
   user_tag: string
   session_id: string
+  server_region: ServerRegion
   pull_hour: number
   pull_minute: number
   pull_second: SecondOption
