@@ -9,31 +9,64 @@ if (!app) {
   throw new Error('Missing #app mount point')
 }
 
+function createCenteredWrapper() {
+  const wrapper = document.createElement('div')
+  wrapper.className = 'flex items-center justify-center min-h-screen p-4'
+  return wrapper
+}
+
+function createSetupError() {
+  const card = document.createElement('div')
+  card.className = 'bg-gradient-to-br from-red-900 to-red-500 text-white rounded-lg p-4 text-center font-semibold shadow-lg max-w-2xl'
+
+  const title = document.createElement('div')
+  title.className = 'text-base mb-2'
+  title.textContent = 'Supabase Not Configured'
+  card.appendChild(title)
+
+  const body = document.createElement('div')
+  body.className = 'font-medium opacity-95 text-sm'
+
+  const text1 = document.createTextNode('Copy ')
+  body.appendChild(text1)
+
+  const code1 = document.createElement('code')
+  code1.className = 'bg-white/15 px-1 rounded'
+  code1.textContent = '.env.example'
+  body.appendChild(code1)
+
+  const text2 = document.createTextNode(' to ')
+  body.appendChild(text2)
+
+  const code2 = document.createElement('code')
+  code2.className = 'bg-white/15 px-1 rounded'
+  code2.textContent = '.env'
+  body.appendChild(code2)
+
+  const text3 = document.createTextNode(' and fill in your Supabase URL and anon key, then restart the dev server.')
+  body.appendChild(text3)
+
+  card.appendChild(body)
+
+  const wrapper = createCenteredWrapper()
+  wrapper.appendChild(card)
+  return wrapper
+}
+
 if (!isSupabaseConfigured()) {
-  app.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem;">
-      <div class="setup-error" style="max-width:640px;">
-        <div style="font-size:1.1rem;margin-bottom:0.5rem;">Supabase Not Configured</div>
-        <div style="font-weight:500;opacity:0.95;font-size:0.85rem;">
-          Copy <code style="background:rgba(255,255,255,0.15);padding:0.125rem 0.375rem;border-radius:0.25rem;">.env.example</code>
-          to <code style="background:rgba(255,255,255,0.15);padding:0.125rem 0.375rem;border-radius:0.25rem;">.env</code>
-          and fill in your Supabase URL and anon key, then restart the dev server.
-        </div>
-      </div>
-    </div>
-  `
+  app.appendChild(createSetupError())
 } else {
   // Header
   const header = document.createElement('div')
-  header.className = 'app-header'
+  header.className = 'flex items-center justify-between px-5 py-3 border-b border-border-subtle bg-surface/90 backdrop-blur-xl shrink-0'
 
   const title = document.createElement('div')
-  title.className = 'app-title'
+  title.className = 'font-black text-sm tracking-widest uppercase bg-gradient-to-r from-purple-bright to-gold-bright bg-clip-text text-transparent'
   title.textContent = 'NTE PRNG Logger'
   header.appendChild(title)
 
   const clock = document.createElement('div')
-  clock.className = 'app-clock'
+  clock.className = 'tabular-nums font-bold text-base text-text-muted tracking-wide font-[var(--font-mono)]'
   header.appendChild(clock)
 
   function updateClock() {
@@ -49,26 +82,26 @@ if (!isSupabaseConfigured()) {
 
   app.appendChild(header)
 
-  // Dashboard: left form + right heatmap+feed stacked
+  // Dashboard: stacked on mobile, side-by-side on desktop
   const dashboard = document.createElement('div')
-  dashboard.className = 'app-dashboard'
+  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 overflow-hidden min-h-0'
 
   const leftPanel = document.createElement('div')
-  leftPanel.className = 'panel left-panel'
+  leftPanel.className = 'flex flex-col min-h-0 overflow-hidden md:w-[400px] shrink-0'
 
   const rightPanel = document.createElement('div')
-  rightPanel.className = 'panel right-panel'
+  rightPanel.className = 'flex flex-col gap-4 flex-1 min-h-0 overflow-hidden'
 
   dashboard.appendChild(leftPanel)
   dashboard.appendChild(rightPanel)
   app.appendChild(dashboard)
 
-  // Right panel has stacked heatmap + feed
+  // Right panel: heatmap + feed stacked
   const heatmapPanel = document.createElement('div')
-  heatmapPanel.className = 'panel heatmap-panel'
+  heatmapPanel.className = 'flex flex-col shrink-0'
 
   const feedPanel = document.createElement('div')
-  feedPanel.className = 'panel panel-scroll feed-panel'
+  feedPanel.className = 'flex flex-col flex-1 min-h-0 overflow-hidden'
 
   rightPanel.appendChild(heatmapPanel)
   rightPanel.appendChild(feedPanel)

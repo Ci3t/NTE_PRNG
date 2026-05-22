@@ -15,29 +15,27 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   let refreshTimer: number | null = null
 
   const wrap = document.createElement('div')
-  wrap.className = 'surface'
-  wrap.style.display = 'flex'
-  wrap.style.flexDirection = 'column'
+  wrap.className = 'flex flex-col bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-lg p-4 shadow-lg'
 
   // Header
   const header = document.createElement('div')
-  header.className = 'heading'
+  header.className = 'font-extrabold text-[0.65rem] tracking-widest uppercase text-text-muted mb-2 flex items-center justify-between'
   header.textContent = 'Heatmap'
 
   const refreshBtn = document.createElement('button')
-  refreshBtn.className = 'btn btn-ghost'
+  refreshBtn.className = 'bg-transparent text-text-dim border border-border rounded px-2 py-1 text-xs font-bold cursor-pointer transition-all hover:text-text-muted hover:bg-surface-raised'
   refreshBtn.type = 'button'
   refreshBtn.textContent = 'Refresh'
   refreshBtn.addEventListener('click', () => load(true))
   header.appendChild(refreshBtn)
   wrap.appendChild(header)
 
-  // Stat filter (compact horizontal)
+  // Stat filter
   const statFilterRow = document.createElement('div')
-  statFilterRow.className = 'filter-row'
+  statFilterRow.className = 'flex items-center gap-2 flex-wrap mb-2'
 
   const statFilterLabel = document.createElement('span')
-  statFilterLabel.className = 'filter-label'
+  statFilterLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
   statFilterLabel.textContent = 'Stats'
   statFilterRow.appendChild(statFilterLabel)
 
@@ -45,11 +43,9 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   const statKeys = Object.keys(STAT_LABELS) as StatKey[]
   for (const key of statKeys) {
     const btn = document.createElement('button')
-    btn.className = 'btn btn-stat'
+    btn.className = 'bg-surface-raised border border-border rounded px-1.5 py-0.5 text-[0.65rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text'
     btn.type = 'button'
     btn.textContent = STAT_LABELS[key]
-    btn.style.padding = '0.25rem 0.4rem'
-    btn.style.fontSize = '0.65rem'
     btn.addEventListener('click', () => {
       if (selectedStats.has(key)) {
         selectedStats.delete(key)
@@ -66,10 +62,10 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   // Hour filter
   const hourFilterRow = document.createElement('div')
-  hourFilterRow.className = 'filter-row'
+  hourFilterRow.className = 'flex items-center gap-2 flex-wrap mb-2'
 
   const hourFilterLabel = document.createElement('span')
-  hourFilterLabel.className = 'filter-label'
+  hourFilterLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
   hourFilterLabel.textContent = 'Window'
   hourFilterRow.appendChild(hourFilterLabel)
 
@@ -83,11 +79,9 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   const hourButtons = new Map<string, HTMLButtonElement>()
   for (const opt of hourOptions) {
     const btn = document.createElement('button')
-    btn.className = 'btn btn-second'
+    btn.className = 'bg-surface-raised border border-border rounded px-1.5 py-0.5 text-[0.7rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text'
     btn.type = 'button'
     btn.textContent = opt.label
-    btn.style.padding = '0.25rem 0.4rem'
-    btn.style.fontSize = '0.7rem'
     btn.addEventListener('click', () => {
       hourFilter = opt.value
       refreshHourButtons()
@@ -98,7 +92,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
 
   const clearBtn = document.createElement('button')
-  clearBtn.className = 'btn btn-ghost'
+  clearBtn.className = 'bg-transparent text-text-dim border border-border rounded px-1.5 py-0.5 text-xs font-bold cursor-pointer transition-all hover:text-text-muted hover:bg-surface-raised'
   clearBtn.type = 'button'
   clearBtn.textContent = 'Clear'
   clearBtn.addEventListener('click', () => {
@@ -111,21 +105,19 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   // Date filter
   const dateFilterRow = document.createElement('div')
-  dateFilterRow.className = 'filter-row'
+  dateFilterRow.className = 'flex items-center gap-2 flex-wrap mb-2'
 
   const dateFilterLabel = document.createElement('span')
-  dateFilterLabel.className = 'filter-label'
+  dateFilterLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
   dateFilterLabel.textContent = 'Date'
   dateFilterRow.appendChild(dateFilterLabel)
 
   const dateButtons = new Map<string, HTMLButtonElement>()
   for (const opt of DATE_FILTER_OPTIONS) {
     const btn = document.createElement('button')
-    btn.className = 'btn btn-second'
+    btn.className = 'bg-surface-raised border border-border rounded px-1.5 py-0.5 text-[0.7rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text'
     btn.type = 'button'
     btn.textContent = opt.label
-    btn.style.padding = '0.25rem 0.4rem'
-    btn.style.fontSize = '0.7rem'
     btn.addEventListener('click', () => {
       dateFilter = opt.value
       refreshDateButtons()
@@ -138,12 +130,12 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   // Status
   const statusText = document.createElement('div')
-  statusText.className = 'status-bar'
+  statusText.className = 'text-xs text-text-muted text-center py-1 font-semibold'
   wrap.appendChild(statusText)
 
   // Grid
   const grid = document.createElement('div')
-  grid.className = 'heatmap-grid'
+  grid.className = 'grid grid-cols-4 md:grid-cols-6 gap-2'
   wrap.appendChild(grid)
 
   container.appendChild(wrap)
@@ -152,18 +144,18 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   for (const sec of SECOND_OPTIONS) {
     const cell = document.createElement('button')
-    cell.className = 'heatmap-cell'
+    cell.className = 'relative flex flex-col items-center justify-center gap-1 py-2.5 px-1.5 rounded border bg-surface-raised border-border cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl'
     cell.type = 'button'
 
     const label = document.createElement('div')
-    label.className = 'sec-label'
+    label.className = 'font-extrabold text-base text-text tracking-wide'
     label.textContent = `:${sec.toString().padStart(2, '0')}`
 
     const pct = document.createElement('div')
-    pct.className = 'sec-pct'
+    pct.className = 'font-bold text-sm text-text'
 
     const meta = document.createElement('div')
-    meta.className = 'sec-meta'
+    meta.className = 'text-xs text-text-muted text-center'
 
     cell.appendChild(label)
     cell.appendChild(pct)
@@ -188,25 +180,59 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
 
   function refreshStatFilterButtons() {
     for (const [key, btn] of statFilterButtons.entries()) {
-      btn.classList.toggle('is-active', selectedStats.has(key))
+      const active = selectedStats.has(key)
+      btn.classList.toggle('bg-green/18', active)
+      btn.classList.toggle('text-green', active)
+      btn.classList.toggle('border-green-dim', active)
+      btn.classList.toggle('shadow-lg', active)
+      btn.classList.toggle('shadow-green/15', active)
+      btn.classList.toggle('bg-surface-raised', !active)
+      btn.classList.toggle('border-border', !active)
+      btn.classList.toggle('text-text-muted', !active)
     }
   }
 
   function refreshHourButtons() {
     for (const [value, btn] of hourButtons.entries()) {
-      btn.classList.toggle('is-active', String(hourFilter) === value)
+      const active = String(hourFilter) === value
+      btn.classList.toggle('bg-gradient-to-br', active)
+      btn.classList.toggle('from-purple', active)
+      btn.classList.toggle('to-purple-dim', active)
+      btn.classList.toggle('text-white', active)
+      btn.classList.toggle('border-purple-bright', active)
+      btn.classList.toggle('shadow-lg', active)
+      btn.classList.toggle('shadow-purple/15', active)
+      btn.classList.toggle('bg-surface-raised', !active)
+      btn.classList.toggle('border-border', !active)
+      btn.classList.toggle('text-text-muted', !active)
     }
   }
 
   function refreshDateButtons() {
     for (const [value, btn] of dateButtons.entries()) {
-      btn.classList.toggle('is-active', dateFilter === value)
+      const active = dateFilter === value
+      btn.classList.toggle('bg-gradient-to-br', active)
+      btn.classList.toggle('from-purple', active)
+      btn.classList.toggle('to-purple-dim', active)
+      btn.classList.toggle('text-white', active)
+      btn.classList.toggle('border-purple-bright', active)
+      btn.classList.toggle('shadow-lg', active)
+      btn.classList.toggle('shadow-purple/15', active)
+      btn.classList.toggle('bg-surface-raised', !active)
+      btn.classList.toggle('border-border', !active)
+      btn.classList.toggle('text-text-muted', !active)
     }
   }
 
   function updateSelection() {
     for (const [sec, cell] of cellMap.entries()) {
-      cell.classList.toggle('is-selected', sec === selectedSecond)
+      const active = sec === selectedSecond
+      cell.classList.toggle('border-gold', active)
+      cell.classList.toggle('ring-2', active)
+      cell.classList.toggle('ring-gold/15', active)
+      cell.classList.toggle('shadow-xl', active)
+      cell.classList.toggle('z-10', active)
+      cell.classList.toggle('border-border', !active)
     }
   }
 
@@ -253,20 +279,20 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
 
   function colorClassNoStats(total: number): string {
-    if (total === 0) return 'hm-empty'
-    if (total <= 5) return 'hm-low'
-    if (total <= 20) return 'hm-mid'
-    if (total <= 50) return 'hm-high'
-    return 'hm-gold'
+    if (total === 0) return 'border-border bg-surface-raised'
+    if (total <= 5) return 'border-purple-dim bg-purple-dim/20'
+    if (total <= 20) return 'border-purple bg-purple/20'
+    if (total <= 50) return 'border-gold-dim bg-gold-dim/25'
+    return 'border-gold bg-gold/25 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]'
   }
 
   function colorClassWithStats(pct: number, total: number): string {
-    if (total === 0) return 'hm-empty'
-    if (pct === 0) return 'hm-empty'
-    if (pct <= 15) return 'hm-low'
-    if (pct <= 30) return 'hm-mid'
-    if (pct <= 50) return 'hm-high'
-    return 'hm-gold'
+    if (total === 0) return 'border-border bg-surface-raised'
+    if (pct === 0) return 'border-border bg-surface-raised'
+    if (pct <= 15) return 'border-purple-dim bg-purple-dim/20'
+    if (pct <= 30) return 'border-purple bg-purple/20'
+    if (pct <= 50) return 'border-gold-dim bg-gold-dim/25'
+    return 'border-gold bg-gold/25 shadow-[inset_0_0_20px_rgba(245,158,11,0.05)]'
   }
 
   function render() {
@@ -282,10 +308,14 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
       const pctEl = cell.querySelector('.sec-pct') as HTMLDivElement
       const metaEl = cell.querySelector('.sec-meta') as HTMLDivElement
 
-      cell.classList.remove('hm-empty', 'hm-low', 'hm-mid', 'hm-high', 'hm-gold')
+      // Reset classes
+      cell.className = 'relative flex flex-col items-center justify-center gap-1 py-2.5 px-1.5 rounded border cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-xl'
+      const colorClass = !hasStats ? colorClassNoStats(total) : colorClassWithStats(total > 0 ? Math.round((match / total) * 100) : 0, total)
+      for (const cls of colorClass.split(' ')) {
+        if (cls) cell.classList.add(cls)
+      }
 
       if (!hasStats) {
-        cell.classList.add(colorClassNoStats(total))
         if (total === 0) {
           pctEl.textContent = '—'
           metaEl.textContent = 'No data'
@@ -295,7 +325,6 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
         }
       } else {
         const pct = total > 0 ? Math.round((match / total) * 100) : 0
-        cell.classList.add(colorClassWithStats(pct, total))
         if (total === 0) {
           pctEl.textContent = '—'
           metaEl.textContent = 'No data'
@@ -305,6 +334,8 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
         }
       }
     }
+
+    updateSelection()
 
     if (allPulls.length === 0) {
       statusText.textContent = 'No data loaded yet'
@@ -327,7 +358,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     } catch (err) {
       const msg = normalizeError(err)
       statusText.textContent = `Error: ${msg}`
-      statusText.style.color = 'var(--red)'
+      statusText.classList.add('text-red')
     }
   }
 
