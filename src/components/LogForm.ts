@@ -38,6 +38,13 @@ function getNowParts(): {
   }
 }
 
+function formatDateLabel(): string {
+  const now = new Date()
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${days[now.getDay()]} ${months[now.getMonth()]} ${now.getDate()}`
+}
+
 export interface LogFormCallbacks {
   onSubmitted: () => void
 }
@@ -83,6 +90,12 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
   heading.className = 'heading'
   heading.textContent = 'Log Pull'
   formEl.appendChild(heading)
+
+  // Date display
+  const dateDisplay = document.createElement('div')
+  dateDisplay.className = 'date-display'
+  dateDisplay.textContent = formatDateLabel()
+  formEl.appendChild(dateDisplay)
 
   // User tag
   const tagInput = document.createElement('input')
@@ -221,6 +234,19 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
   submitArea.appendChild(successEl)
 
   formEl.appendChild(submitArea)
+
+  // Testing tip card
+  const tipCard = document.createElement('div')
+  tipCard.className = 'tip-card'
+  const tipTitle = document.createElement('div')
+  tipTitle.className = 'tip-title'
+  tipTitle.textContent = 'How to Find Your Zone'
+  const tipBody = document.createElement('div')
+  tipBody.className = 'tip-body'
+  tipBody.innerHTML = `Run <b>Easy / Normal</b> mode and pull at the same <b>:SS</b> window repeatedly. Note where <b>CRIT Rate</b> + <b>CRIT DMG</b> land — that\'s your hot zone. Test each hour separately; RNG windows shift hourly.`
+  tipCard.appendChild(tipTitle)
+  tipCard.appendChild(tipBody)
+  formEl.appendChild(tipCard)
 
   formEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {

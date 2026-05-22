@@ -40,6 +40,16 @@ export const SECOND_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55] as 
 
 export type SecondOption = (typeof SECOND_OPTIONS)[number]
 
+export type DateFilter = 'all' | 'today' | 'yesterday' | 'week' | 'last7'
+
+export const DATE_FILTER_OPTIONS: { value: DateFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yday' },
+  { value: 'week', label: 'Week' },
+  { value: 'last7', label: '7d' },
+]
+
 export interface PullInsertPayload {
   user_tag: string
   session_id: string
@@ -104,9 +114,4 @@ export interface SecondStatsRow {
   break_count: number
   cycle_count: number
   dual_crit_pct: number | null
-}
-
-export interface FeedFilters {
-  secondFilter: SecondOption | null
-  myPullsOnly: boolean
 }

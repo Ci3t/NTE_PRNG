@@ -3,6 +3,7 @@ import type {
   PullInsertPayload,
   PullRow,
   SecondStatsRow,
+  DateFilter,
 } from './types.ts'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -30,6 +31,35 @@ export function normalizeError(error: unknown): string {
   if (error instanceof Error) return error.message
   if (typeof error === 'string') return error
   return 'An unexpected error occurred.'
+}
+
+// ── Date filter helpers ──
+export function getDateRange(filter: DateFilter): { start: string; end: string } | null {
+  if (filter === 'all') return null
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+
+  if (filter === 'today') {
+    return { start: startOfToday.toISOString(), end: endOfToday.toISOString() }
+  }
+  if (filter === 'yesterday') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+    return { start: start.toISOString(), end: startOfToday.toISOString() }
+  }
+  if (filter === 'last7') {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
+    return { start: start.toISOString(), end: endOfToday.toISOString() }
+  }
+  if (filter === 'week') {
+    // Monday-based ISO week
+    const dayOfWeek = now.getDay() // 0=Sun, 1=Mon
+    const daysSinceMonday = (dayOfWeek + 6) % 7
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday)
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceMonday + 7)
+    return { start: start.toISOString(), end: end.toISOString() }
+  }
+  return null
 }
 
 // ── Insert rate limiting ──
@@ -75,17 +105,23 @@ const canFetchAllPulls = makeRateLimiter(15000)
 const canFetchRecent = makeRateLimiter(10000)
 const canFetchStats = makeRateLimiter(15000)
 
-export async function fetchAllPulls(limit = 2000): Promise<PullRow[]> {
+export async function fetchAllPulls(dateFilter: DateFilter = 'all', limit = 2000): Promise<PullRow[]> {
   if (!canFetchAllPulls()) {
     throw new Error('Please wait a moment before refreshing.')
   }
   const supabase = getSupabaseClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from('nte_pulls')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
-    .returns<PullRow[]>()
+
+  const range = getDateRange(dateFilter)
+  if (range) {
+    query = query.gte('logged_client_at', range.start).lt('logged_client_at', range.end)
+  }
+
+  const { data, error } = await query.returns<PullRow[]>()
   if (error) {
     throw new Error(error.message)
   }

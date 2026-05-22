@@ -1,4 +1,4 @@
-import { type StatKey, type SecondOption, SECOND_OPTIONS, STAT_LABELS } from '../types.ts'
+import { type StatKey, type SecondOption, type DateFilter, SECOND_OPTIONS, STAT_LABELS, DATE_FILTER_OPTIONS } from '../types.ts'
 import { fetchAllPulls, normalizeError } from '../db.ts'
 import type { PullRow } from '../types.ts'
 
@@ -10,6 +10,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   let selectedSecond: SecondOption | null = null
   let selectedStats = new Set<StatKey>()
   let hourFilter: 'all' | 'current' | -1 | -2 = 'all'
+  let dateFilter: DateFilter = 'all'
   let allPulls: PullRow[] = []
   let refreshTimer: number | null = null
 
@@ -108,6 +109,33 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   hourFilterRow.appendChild(clearBtn)
   wrap.appendChild(hourFilterRow)
 
+  // Date filter
+  const dateFilterRow = document.createElement('div')
+  dateFilterRow.className = 'filter-row'
+
+  const dateFilterLabel = document.createElement('span')
+  dateFilterLabel.className = 'filter-label'
+  dateFilterLabel.textContent = 'Date'
+  dateFilterRow.appendChild(dateFilterLabel)
+
+  const dateButtons = new Map<string, HTMLButtonElement>()
+  for (const opt of DATE_FILTER_OPTIONS) {
+    const btn = document.createElement('button')
+    btn.className = 'btn btn-second'
+    btn.type = 'button'
+    btn.textContent = opt.label
+    btn.style.padding = '0.25rem 0.4rem'
+    btn.style.fontSize = '0.7rem'
+    btn.addEventListener('click', () => {
+      dateFilter = opt.value
+      refreshDateButtons()
+      load()
+    })
+    dateButtons.set(opt.value, btn)
+    dateFilterRow.appendChild(btn)
+  }
+  wrap.appendChild(dateFilterRow)
+
   // Status
   const statusText = document.createElement('div')
   statusText.className = 'status-bar'
@@ -156,6 +184,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
 
   refreshHourButtons()
+  refreshDateButtons()
 
   function refreshStatFilterButtons() {
     for (const [key, btn] of statFilterButtons.entries()) {
@@ -166,6 +195,12 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   function refreshHourButtons() {
     for (const [value, btn] of hourButtons.entries()) {
       btn.classList.toggle('is-active', String(hourFilter) === value)
+    }
+  }
+
+  function refreshDateButtons() {
+    for (const [value, btn] of dateButtons.entries()) {
+      btn.classList.toggle('is-active', dateFilter === value)
     }
   }
 
@@ -275,18 +310,19 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
       statusText.textContent = 'No data loaded yet'
     } else {
       const filteredCount = allPulls.filter(matchesHourFilter).length
+      const dateLabel = DATE_FILTER_OPTIONS.find(d => d.value === dateFilter)?.label ?? 'All'
       if (hasStats) {
         const statNames = Array.from(selectedStats).map(s => STAT_LABELS[s]).join(' + ')
-        statusText.textContent = `${statNames} rate • ${filteredCount} pulls`
+        statusText.textContent = `${dateLabel} • ${statNames} rate • ${filteredCount} pulls`
       } else {
-        statusText.textContent = `Volume • ${filteredCount} pulls in window`
+        statusText.textContent = `${dateLabel} • Volume • ${filteredCount} pulls in window`
       }
     }
   }
 
   async function load() {
     try {
-      allPulls = await fetchAllPulls(2000)
+      allPulls = await fetchAllPulls(dateFilter, 2000)
       render()
     } catch (err) {
       const msg = normalizeError(err)

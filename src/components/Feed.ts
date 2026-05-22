@@ -15,11 +15,29 @@ function timeAgo(iso: string): string {
   return `${seconds}s ago`
 }
 
-function formatPullTime(row: PullRow): string {
+function formatDateTimeLabel(row: PullRow): string {
+  const date = new Date(row.logged_client_at)
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+
+  let datePrefix = ''
+  if (date < startOfYesterday) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7))
+    if (date >= startOfWeek) {
+      datePrefix = `${days[date.getDay()]} `
+    } else {
+      datePrefix = `${date.getMonth() + 1}/${date.getDate()} `
+    }
+  } else if (date < startOfToday) {
+    datePrefix = 'Yesterday '
+  }
+
   const h = row.pull_hour.toString().padStart(2, '0')
   const m = row.pull_minute.toString().padStart(2, '0')
   const s = row.pull_second.toString().padStart(2, '0')
-  return `${h}:${m}:${s}`
+  return `${datePrefix}${h}:${m}:${s} • ${timeAgo(row.created_at)}`
 }
 
 export interface FeedCallbacks {
@@ -106,7 +124,7 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
 
       const time = document.createElement('div')
       time.className = 'feed-time'
-      time.textContent = `${formatPullTime(row)} • ${timeAgo(row.created_at)}`
+      time.textContent = formatDateTimeLabel(row)
 
       top.appendChild(user)
       top.appendChild(time)
