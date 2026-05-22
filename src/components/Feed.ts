@@ -1,5 +1,5 @@
 import { type PullRow, type SecondOption, type StatKey, STAT_LABELS, HIGH_VALUE_STATS } from '../types.ts'
-import { getSessionId } from '../session.ts'
+import { getUserTag } from '../session.ts'
 import { fetchRecentPulls, normalizeError } from '../db.ts'
 
 function timeAgo(iso: string): string {
@@ -51,7 +51,7 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
   let pulls: PullRow[] = []
   let secondFilter: SecondOption | null = null
   let myPullsOnly = false
-  const mySession = getSessionId()
+  const myTag = getUserTag()
 
   const wrap = document.createElement('div')
   wrap.className = 'flex flex-col flex-1 min-h-0 bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-lg p-4 shadow-lg'
@@ -100,11 +100,21 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
   function renderList() {
     clearList()
 
-    const filtered = pulls.filter((p) => {
+    let filtered = pulls.filter((p) => {
       if (secondFilter !== null && p.pull_second !== secondFilter) return false
-      if (myPullsOnly && p.session_id !== mySession) return false
       return true
     })
+
+    if (myPullsOnly) {
+      if (!myTag) {
+        const empty = document.createElement('div')
+        empty.className = 'text-center text-text-dim py-5 px-3 text-sm'
+        empty.textContent = 'Enter your tag in the Log Form to use Mine filter'
+        list.appendChild(empty)
+        return
+      }
+      filtered = filtered.filter((p) => p.user_tag === myTag)
+    }
 
     if (filtered.length === 0) {
       const empty = document.createElement('div')

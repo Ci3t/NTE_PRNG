@@ -128,11 +128,6 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
   wrap.appendChild(dateFilterRow)
 
-  // Status
-  const statusText = document.createElement('div')
-  statusText.className = 'text-xs text-text-muted text-center py-1 font-semibold'
-  wrap.appendChild(statusText)
-
   // Grid
   const grid = document.createElement('div')
   grid.className = 'grid grid-cols-4 md:grid-cols-6 gap-2'
@@ -152,10 +147,10 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     label.textContent = `:${sec.toString().padStart(2, '0')}`
 
     const pct = document.createElement('div')
-    pct.className = 'font-bold text-sm text-text'
+    pct.className = 'sec-pct font-extrabold text-sm text-green tracking-wide'
 
     const meta = document.createElement('div')
-    meta.className = 'text-xs text-text-muted text-center'
+    meta.className = 'sec-meta text-[0.65rem] text-text-muted text-center font-semibold'
 
     cell.appendChild(label)
     cell.appendChild(pct)
@@ -174,6 +169,11 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     cellMap.set(sec, cell)
     grid.appendChild(cell)
   }
+
+  // Status footer below grid so card feels finished
+  const statusText = document.createElement('div')
+  statusText.className = 'text-xs text-text-muted text-center py-2 font-semibold border-t border-border-subtle mt-2'
+  wrap.appendChild(statusText)
 
   refreshHourButtons()
   refreshDateButtons()
