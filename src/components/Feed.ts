@@ -16,7 +16,8 @@ function timeAgo(iso: string): string {
 }
 
 function formatDateTimeLabel(row: PullRow): string {
-  const date = new Date(row.logged_client_at)
+  const rawDate = row.logged_client_at || row.created_at
+  const date = new Date(rawDate)
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
@@ -32,6 +33,8 @@ function formatDateTimeLabel(row: PullRow): string {
     }
   } else if (date < startOfToday) {
     datePrefix = 'Yesterday '
+  } else {
+    datePrefix = 'Today '
   }
 
   const h = row.pull_hour.toString().padStart(2, '0')
@@ -168,9 +171,9 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
     }
   }
 
-  async function load() {
+  async function load(force = false) {
     try {
-      pulls = await fetchRecentPulls(25)
+      pulls = await fetchRecentPulls(25, force)
       renderList()
     } catch (err) {
       list.innerHTML = ''
@@ -184,7 +187,7 @@ export function mountFeed(container: HTMLElement, _callbacks: FeedCallbacks) {
   load()
 
   return {
-    refresh: load,
+    refresh: () => load(true),
     setSecondFilter: (sec: SecondOption | null) => {
       secondFilter = sec
       renderList()

@@ -28,7 +28,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   refreshBtn.className = 'btn btn-ghost'
   refreshBtn.type = 'button'
   refreshBtn.textContent = 'Refresh'
-  refreshBtn.addEventListener('click', () => load())
+  refreshBtn.addEventListener('click', () => load(true))
   header.appendChild(refreshBtn)
   wrap.appendChild(header)
 
@@ -129,7 +129,7 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     btn.addEventListener('click', () => {
       dateFilter = opt.value
       refreshDateButtons()
-      load()
+      load(true)
     })
     dateButtons.set(opt.value, btn)
     dateFilterRow.appendChild(btn)
@@ -320,9 +320,9 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
     }
   }
 
-  async function load() {
+  async function load(force = false) {
     try {
-      allPulls = await fetchAllPulls(dateFilter, 2000)
+      allPulls = await fetchAllPulls(dateFilter, 2000, force)
       render()
     } catch (err) {
       const msg = normalizeError(err)
@@ -332,10 +332,10 @@ export function mountHeatMap(container: HTMLElement, callbacks: HeatMapCallbacks
   }
 
   load()
-  refreshTimer = window.setInterval(load, 180000)
+  refreshTimer = window.setInterval(() => load(), 180000)
 
   return {
-    refresh: load,
+    refresh: () => load(true),
     clearTimer: () => {
       if (refreshTimer) {
         clearInterval(refreshTimer)

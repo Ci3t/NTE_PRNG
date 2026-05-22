@@ -105,8 +105,12 @@ const canFetchAllPulls = makeRateLimiter(15000)
 const canFetchRecent = makeRateLimiter(10000)
 const canFetchStats = makeRateLimiter(15000)
 
-export async function fetchAllPulls(dateFilter: DateFilter = 'all', limit = 2000): Promise<PullRow[]> {
-  if (!canFetchAllPulls()) {
+export async function fetchAllPulls(
+  dateFilter: DateFilter = 'all',
+  limit = 2000,
+  force = false
+): Promise<PullRow[]> {
+  if (!force && !canFetchAllPulls()) {
     throw new Error('Please wait a moment before refreshing.')
   }
   const supabase = getSupabaseClient()
@@ -128,8 +132,8 @@ export async function fetchAllPulls(dateFilter: DateFilter = 'all', limit = 2000
   return data ?? []
 }
 
-export async function fetchSecondStats(): Promise<SecondStatsRow[]> {
-  if (!canFetchStats()) {
+export async function fetchSecondStats(force = false): Promise<SecondStatsRow[]> {
+  if (!force && !canFetchStats()) {
     throw new Error('Please wait a moment before refreshing.')
   }
   const supabase = getSupabaseClient()
@@ -143,8 +147,8 @@ export async function fetchSecondStats(): Promise<SecondStatsRow[]> {
   return data ?? []
 }
 
-export async function fetchRecentPulls(limit = 50): Promise<PullRow[]> {
-  if (!canFetchRecent()) {
+export async function fetchRecentPulls(limit = 50, force = false): Promise<PullRow[]> {
+  if (!force && !canFetchRecent()) {
     throw new Error('Please wait a moment before refreshing.')
   }
   const supabase = getSupabaseClient()
