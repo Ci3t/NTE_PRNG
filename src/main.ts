@@ -84,13 +84,14 @@ if (!isSupabaseConfigured()) {
 
   // Dashboard: stacked on mobile, side-by-side on desktop
   const dashboard = document.createElement('div')
-  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 overflow-hidden min-h-0'
+  // Mobile: scrollable full page; Desktop: locked height, panels scroll independently
+  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden overflow-y-auto'
 
   const leftPanel = document.createElement('div')
-  leftPanel.className = 'flex flex-col min-h-0 overflow-hidden md:w-[400px] shrink-0'
+  leftPanel.className = 'flex flex-col min-h-0 md:w-[400px] shrink-0 md:overflow-hidden'
 
   const rightPanel = document.createElement('div')
-  rightPanel.className = 'flex flex-col gap-4 flex-1 min-h-0 overflow-hidden'
+  rightPanel.className = 'flex flex-col gap-4 flex-1 min-h-0 md:overflow-hidden'
 
   dashboard.appendChild(leftPanel)
   dashboard.appendChild(rightPanel)
@@ -101,7 +102,7 @@ if (!isSupabaseConfigured()) {
   heatmapPanel.className = 'flex flex-col shrink-0'
 
   const feedPanel = document.createElement('div')
-  feedPanel.className = 'flex flex-col flex-1 min-h-0 overflow-hidden'
+  feedPanel.className = 'flex flex-col flex-1 min-h-0 md:overflow-hidden'
 
   rightPanel.appendChild(heatmapPanel)
   rightPanel.appendChild(feedPanel)
