@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS nte_pulls (
   created_at timestamptz DEFAULT now() NOT NULL,
   user_tag text NOT NULL,
   session_id uuid NOT NULL,
-  server_region text NOT NULL DEFAULT 'Global' CHECK (server_region IN ('EU','NA','Asia','Global')),
+  server_region text NOT NULL DEFAULT 'EU' CHECK (server_region IN ('EU','NA','Asia')),
   pull_hour int NOT NULL CHECK (pull_hour BETWEEN 0 AND 23),
   pull_minute int NOT NULL CHECK (pull_minute BETWEEN 0 AND 59),
   pull_second int NOT NULL CHECK (pull_second IN (0,5,10,15,20,25,30,35,40,45,50,55)),
@@ -62,8 +62,3 @@ SELECT
   round(count(*) FILTER (WHERE is_dual_crit) * 100.0 / nullif(count(*), 0), 2) as dual_crit_pct
 FROM nte_pulls
 GROUP BY pull_second;
-
--- ── Migration: set existing Ci3t pulls to EU ──
--- Run this once in Supabase SQL Editor after adding the column:
--- UPDATE nte_pulls SET server_region = 'EU' WHERE user_tag = 'Ci3t';
--- Then verify: SELECT user_tag, server_region, COUNT(*) FROM nte_pulls GROUP BY user_tag, server_region;
