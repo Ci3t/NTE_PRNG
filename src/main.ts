@@ -85,7 +85,7 @@ if (!isSupabaseConfigured()) {
   // Dashboard: stacked on mobile, side-by-side on desktop
   const dashboard = document.createElement('div')
   // Mobile: scrollable full page; Desktop: locked height, panels scroll independently
-  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden overflow-y-auto'
+  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden'
 
   const leftPanel = document.createElement('div')
   leftPanel.className = 'flex flex-col min-h-0 md:w-[400px] shrink-0 md:overflow-hidden'
