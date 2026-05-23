@@ -3,12 +3,13 @@ import {
   type StatKey,
   type SecondOption,
   type ServerRegion,
+  type PullMode,
   SECOND_OPTIONS,
   STAT_LABELS,
   SERVER_OPTIONS,
 } from '../types.ts'
 import { getUserTag, setUserTag, getSessionId, getServerRegion, setServerRegion } from '../session.ts'
-import { insertPull, normalizeError } from '../db.ts'
+import { insertPull, insertConsolePull, normalizeError } from '../db.ts'
 
 function pad2(n: number): string {
   return n.toString().padStart(2, '0')
@@ -51,7 +52,12 @@ export interface LogFormCallbacks {
   onSubmitted: () => void
 }
 
-export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks) {
+export interface LogFormProps {
+  mode: PullMode
+}
+
+export function mountLogForm(container: HTMLElement, props: LogFormProps, callbacks: LogFormCallbacks) {
+  const mode = props.mode
   let liveMode = true
 
   const state = {
@@ -89,10 +95,23 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
   const formEl = document.createElement('div')
   formEl.className = 'flex flex-col gap-2.5 bg-surface/90 backdrop-blur-xl border border-border-subtle rounded-lg p-4 shadow-lg justify-center flex-1 min-h-0 overflow-y-auto scrollbar-thin'
 
-  // Heading
+  // Heading with mode badge
   const heading = document.createElement('div')
   heading.className = 'font-extrabold text-[0.65rem] tracking-widest uppercase text-text-muted mb-1 flex items-center justify-between'
-  heading.textContent = 'Log Pull'
+
+  const headingText = document.createElement('span')
+  headingText.textContent = mode === 'stamina' ? 'Log Stamina Pull' : 'Log Free Pull'
+  heading.appendChild(headingText)
+
+  const modeBadge = document.createElement('span')
+  modeBadge.className = `text-[0.6rem] font-bold px-1.5 py-0.5 rounded border ${
+    mode === 'stamina'
+      ? 'bg-gold/10 text-gold-bright border-gold-dim'
+      : 'bg-purple/10 text-purple-bright border-purple-dim'
+  }`
+  modeBadge.textContent = mode === 'stamina' ? 'STAMINA' : 'FREE'
+  heading.appendChild(modeBadge)
+
   formEl.appendChild(heading)
 
   // Date display
@@ -239,9 +258,13 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
   submitArea.appendChild(errorEl)
 
   const submitBtn = document.createElement('button')
-  submitBtn.className = 'w-full bg-gradient-to-br from-purple to-purple-dim text-white border-transparent rounded py-3 text-sm font-bold cursor-pointer transition-all hover:from-purple-bright hover:to-purple hover:-translate-y-0.5 shadow-lg shadow-purple/15'
+  submitBtn.className = `w-full bg-gradient-to-br text-white border-transparent rounded py-3 text-sm font-bold cursor-pointer transition-all hover:-translate-y-0.5 shadow-lg ${
+    mode === 'stamina'
+      ? 'from-gold to-gold-dim hover:from-gold-bright hover:to-gold shadow-gold/15'
+      : 'from-purple to-purple-dim hover:from-purple-bright hover:to-purple shadow-purple/15'
+  }`
   submitBtn.type = 'button'
-  submitBtn.textContent = 'Log Pull'
+  submitBtn.textContent = mode === 'stamina' ? 'Log Stamina Pull' : 'Log Free Pull'
   submitBtn.addEventListener('click', handleSubmit)
   submitArea.appendChild(submitBtn)
 
@@ -427,7 +450,11 @@ export function mountLogForm(container: HTMLElement, callbacks: LogFormCallbacks
     }
 
     try {
-      await insertPull(payload)
+      if (mode === 'stamina') {
+        await insertConsolePull(payload)
+      } else {
+        await insertPull(payload)
+      }
       state.stats.clear()
       refreshStatButtons()
       notesInput.value = ''

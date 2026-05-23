@@ -1,8 +1,9 @@
-import type { ServerRegion } from './types.ts'
+import type { ServerRegion, PullMode } from './types.ts'
 
 const SESSION_KEY = 'nte_session_id'
 const USER_TAG_KEY = 'nte_user_tag'
 const SERVER_KEY = 'nte_server_region'
+const MODE_KEY = 'nte_pull_mode'
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -43,4 +44,14 @@ export function getServerRegion(): ServerRegion {
 
 export function setServerRegion(region: ServerRegion): void {
   localStorage.setItem(SERVER_KEY, region)
+}
+
+export function getPullMode(): PullMode {
+  const val = localStorage.getItem(MODE_KEY) as PullMode | null
+  if (val === 'free' || val === 'stamina') return val
+  return 'free'
+}
+
+export function setPullMode(mode: PullMode): void {
+  localStorage.setItem(MODE_KEY, mode)
 }

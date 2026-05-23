@@ -2,6 +2,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type {
   PullInsertPayload,
   PullRow,
+  ConsolePullInsertPayload,
+  ConsolePullRow,
   SecondStatsRow,
   DateFilter,
   ServerRegion,
@@ -89,6 +91,27 @@ export async function insertPull(data: PullInsertPayload): Promise<void> {
   insertTimestamps.push(now)
 }
 
+export async function insertConsolePull(data: ConsolePullInsertPayload): Promise<void> {
+  const now = Date.now()
+  const oneMinuteAgo = now - 60000
+  while (insertTimestamps.length > 0 && insertTimestamps[0] < oneMinuteAgo) {
+    insertTimestamps.shift()
+  }
+  if (insertTimestamps.length >= MAX_INSERTS_PER_MINUTE) {
+    throw new Error('Rate limit: max 10 pulls per minute. Please slow down.')
+  }
+  if (insertTimestamps.length > 0 && now - insertTimestamps[insertTimestamps.length - 1] < MIN_INSERT_INTERVAL_MS) {
+    throw new Error('Please wait a few seconds between submissions.')
+  }
+
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from('nte_console_pulls').insert(data)
+  if (error) {
+    throw new Error(error.message)
+  }
+  insertTimestamps.push(now)
+}
+
 // ── Per-function fetch rate limiting ──
 function makeRateLimiter(minIntervalMs: number) {
   let lastFetchTime = 0
@@ -138,6 +161,38 @@ export async function fetchAllPulls(
   return data ?? []
 }
 
+export async function fetchAllConsolePulls(
+  dateFilter: DateFilter = 'all',
+  serverRegion: ServerRegion | 'all' = 'all',
+  limit = 2000,
+  force = false
+): Promise<ConsolePullRow[]> {
+  if (!force && !canFetchAllPulls()) {
+    throw new Error('Please wait a moment before refreshing.')
+  }
+  const supabase = getSupabaseClient()
+  let query = supabase
+    .from('nte_console_pulls')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  const range = getDateRange(dateFilter)
+  if (range) {
+    query = query.gte('logged_client_at', range.start).lt('logged_client_at', range.end)
+  }
+
+  if (serverRegion !== 'all') {
+    query = query.eq('server_region', serverRegion)
+  }
+
+  const { data, error } = await query.returns<ConsolePullRow[]>()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data ?? []
+}
+
 export async function fetchSecondStats(force = false): Promise<SecondStatsRow[]> {
   if (!force && !canFetchStats()) {
     throw new Error('Please wait a moment before refreshing.')
@@ -173,6 +228,32 @@ export async function fetchRecentPulls(
   }
 
   const { data, error } = await query.returns<PullRow[]>()
+  if (error) {
+    throw new Error(error.message)
+  }
+  return data ?? []
+}
+
+export async function fetchRecentConsolePulls(
+  serverRegion: ServerRegion | 'all' = 'all',
+  limit = 50,
+  force = false
+): Promise<ConsolePullRow[]> {
+  if (!force && !canFetchRecent()) {
+    throw new Error('Please wait a moment before refreshing.')
+  }
+  const supabase = getSupabaseClient()
+  let query = supabase
+    .from('nte_console_pulls')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (serverRegion !== 'all') {
+    query = query.eq('server_region', serverRegion)
+  }
+
+  const { data, error } = await query.returns<ConsolePullRow[]>()
   if (error) {
     throw new Error(error.message)
   }

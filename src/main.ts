@@ -3,6 +3,11 @@ import { isSupabaseConfigured } from './db.ts'
 import { mountLogForm } from './components/LogForm.ts'
 import { mountHeatMap } from './components/HeatMap.ts'
 import { mountFeed } from './components/Feed.ts'
+import { mountConsoleHeatMap } from './components/ConsoleHeatMap.ts'
+import { mountConsoleFeed } from './components/ConsoleFeed.ts'
+import { mountExportButton } from './components/DataExport.ts'
+import { getPullMode, setPullMode } from './session.ts'
+import type { PullMode, SecondOption } from './types.ts'
 
 const app = document.getElementById('app')
 if (!app) {
@@ -56,18 +61,84 @@ function createSetupError() {
 if (!isSupabaseConfigured()) {
   app.appendChild(createSetupError())
 } else {
+  let currentMode: PullMode = getPullMode()
+  let freeHeatMapRef: ReturnType<typeof mountHeatMap> | null = null
+  let freeFeedRef: ReturnType<typeof mountFeed> | null = null
+  let consoleHeatMapRef: ReturnType<typeof mountConsoleHeatMap> | null = null
+  let consoleFeedRef: ReturnType<typeof mountConsoleFeed> | null = null
+
   // Header
   const header = document.createElement('div')
   header.className = 'flex items-center justify-between px-5 py-3 border-b border-border-subtle bg-surface/90 backdrop-blur-xl shrink-0'
 
+  const leftHeader = document.createElement('div')
+  leftHeader.className = 'flex items-center gap-3'
+
   const title = document.createElement('div')
   title.className = 'font-black text-sm tracking-widest uppercase bg-gradient-to-r from-purple-bright to-gold-bright bg-clip-text text-transparent'
   title.textContent = 'NTE PRNG Logger'
-  header.appendChild(title)
+  leftHeader.appendChild(title)
+
+  // Mode toggle
+  const modeToggle = document.createElement('div')
+  modeToggle.className = 'flex items-center gap-1 bg-surface-raised border border-border rounded p-0.5'
+
+  const freeBtn = document.createElement('button')
+  freeBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  freeBtn.textContent = 'FREE'
+  freeBtn.type = 'button'
+
+  const staminaBtn = document.createElement('button')
+  staminaBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  staminaBtn.textContent = 'STAMINA'
+  staminaBtn.type = 'button'
+
+  function refreshModeButtons() {
+    const freeActive = currentMode === 'free'
+    freeBtn.classList.toggle('bg-purple', freeActive)
+    freeBtn.classList.toggle('text-white', freeActive)
+    freeBtn.classList.toggle('shadow-sm', freeActive)
+    freeBtn.classList.toggle('text-text-muted', !freeActive)
+
+    staminaBtn.classList.toggle('bg-gold', !freeActive)
+    staminaBtn.classList.toggle('text-white', !freeActive)
+    staminaBtn.classList.toggle('shadow-sm', !freeActive)
+    staminaBtn.classList.toggle('text-text-muted', freeActive)
+  }
+
+  freeBtn.addEventListener('click', () => {
+    if (currentMode !== 'free') {
+      currentMode = 'free'
+      setPullMode(currentMode)
+      refreshModeButtons()
+      swapDashboard()
+    }
+  })
+
+  staminaBtn.addEventListener('click', () => {
+    if (currentMode !== 'stamina') {
+      currentMode = 'stamina'
+      setPullMode(currentMode)
+      refreshModeButtons()
+      swapDashboard()
+    }
+  })
+
+  modeToggle.appendChild(freeBtn)
+  modeToggle.appendChild(staminaBtn)
+  leftHeader.appendChild(modeToggle)
+
+  header.appendChild(leftHeader)
+
+  const rightHeader = document.createElement('div')
+  rightHeader.className = 'flex items-center gap-3'
+
+  // Export button
+  mountExportButton(rightHeader)
 
   const clock = document.createElement('div')
   clock.className = 'tabular-nums font-bold text-base text-text-muted tracking-wide font-[var(--font-mono)]'
-  header.appendChild(clock)
+  rightHeader.appendChild(clock)
 
   function updateClock() {
     const now = new Date()
@@ -80,11 +151,11 @@ if (!isSupabaseConfigured()) {
   updateClock()
   setInterval(updateClock, 50)
 
+  header.appendChild(rightHeader)
   app.appendChild(header)
 
-  // Dashboard: stacked on mobile, side-by-side on desktop
+  // Dashboard wrapper
   const dashboard = document.createElement('div')
-  // Mobile: scrollable full page; Desktop: locked height, panels scroll independently
   dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden'
 
   const leftPanel = document.createElement('div')
@@ -97,28 +168,77 @@ if (!isSupabaseConfigured()) {
   dashboard.appendChild(rightPanel)
   app.appendChild(dashboard)
 
-  // Right panel: heatmap + feed stacked
-  const heatmapPanel = document.createElement('div')
-  heatmapPanel.className = 'flex flex-col shrink-0'
+  // Right panel content areas
+  const freeHeatmapPanel = document.createElement('div')
+  freeHeatmapPanel.className = 'flex flex-col shrink-0'
 
-  const feedPanel = document.createElement('div')
-  feedPanel.className = 'flex flex-col flex-1 min-h-0 md:overflow-hidden'
+  const freeFeedPanel = document.createElement('div')
+  freeFeedPanel.className = 'flex flex-col flex-1 min-h-0 md:overflow-hidden'
 
-  rightPanel.appendChild(heatmapPanel)
-  rightPanel.appendChild(feedPanel)
+  const consoleHeatmapPanel = document.createElement('div')
+  consoleHeatmapPanel.className = 'flex flex-col shrink-0'
 
-  const heatMap = mountHeatMap(heatmapPanel, {
-    onSecondSelected: (second) => {
-      feed.setSecondFilter(second)
-    },
-  })
+  const consoleFeedPanel = document.createElement('div')
+  consoleFeedPanel.className = 'flex flex-col flex-1 min-h-0 md:overflow-hidden'
 
-  const feed = mountFeed(feedPanel, {})
+  function mountFreeComponents() {
+    freeHeatMapRef = mountHeatMap(freeHeatmapPanel, {
+      onSecondSelected: (second: SecondOption | null) => {
+        if (freeFeedRef) freeFeedRef.setSecondFilter(second)
+      },
+    })
 
-  mountLogForm(leftPanel, {
-    onSubmitted: () => {
-      heatMap.refresh()
-      feed.refresh()
-    },
-  })
+    freeFeedRef = mountFeed(freeFeedPanel, {})
+  }
+
+  function mountConsoleComponents() {
+    consoleHeatMapRef = mountConsoleHeatMap(consoleHeatmapPanel, {
+      onSecondSelected: (second: SecondOption | null) => {
+        if (consoleFeedRef) consoleFeedRef.setSecondFilter(second)
+      },
+    })
+
+    consoleFeedRef = mountConsoleFeed(consoleFeedPanel, {})
+  }
+
+  function mountLogFormComponent() {
+    // Clear left panel
+    while (leftPanel.firstChild) {
+      leftPanel.removeChild(leftPanel.firstChild)
+    }
+    mountLogForm(leftPanel, { mode: currentMode }, {
+      onSubmitted: () => {
+        if (currentMode === 'free') {
+          if (freeHeatMapRef) freeHeatMapRef.refresh()
+          if (freeFeedRef) freeFeedRef.refresh()
+        } else {
+          if (consoleHeatMapRef) consoleHeatMapRef.refresh()
+          if (consoleFeedRef) consoleFeedRef.refresh()
+        }
+      },
+    })
+  }
+
+  function swapDashboard() {
+    // Clear right panel
+    while (rightPanel.firstChild) {
+      rightPanel.removeChild(rightPanel.firstChild)
+    }
+
+    if (currentMode === 'free') {
+      rightPanel.appendChild(freeHeatmapPanel)
+      rightPanel.appendChild(freeFeedPanel)
+      if (!freeHeatMapRef) mountFreeComponents()
+    } else {
+      rightPanel.appendChild(consoleHeatmapPanel)
+      rightPanel.appendChild(consoleFeedPanel)
+      if (!consoleHeatMapRef) mountConsoleComponents()
+    }
+
+    mountLogFormComponent()
+  }
+
+  // Initial mount
+  refreshModeButtons()
+  swapDashboard()
 }

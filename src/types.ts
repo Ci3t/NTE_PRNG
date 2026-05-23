@@ -61,6 +61,8 @@ export const SERVER_FILTER_OPTIONS: { value: ServerRegion | 'all'; label: string
   { value: 'Asia', label: 'Asia' },
 ]
 
+export type PullMode = 'free' | 'stamina'
+
 export interface PullInsertPayload {
   user_tag: string
   session_id: string
@@ -113,6 +115,10 @@ export interface PullRow {
   is_dual_crit: boolean
   created_at: string
 }
+
+// Console pulls use the exact same shape (stamina/energy artifact pulls)
+export type ConsolePullInsertPayload = PullInsertPayload
+export type ConsolePullRow = PullRow
 
 export interface SecondStatsRow {
   pull_second: SecondOption
