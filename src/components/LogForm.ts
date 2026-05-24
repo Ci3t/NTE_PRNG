@@ -60,7 +60,7 @@ export interface LogFormProps {
   mode: PullMode
 }
 
-interface BatchDrop {
+interface DropConfig {
   stats: Set<StatKey>
   mainStat: ConsoleMainStat | null
 }
@@ -80,7 +80,17 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     clientAt: '',
     offset: 0,
     mainStat: null as ConsoleMainStat | null,
-    batch: [] as BatchDrop[],
+    dropCount: 5,
+    drops: [] as DropConfig[],
+  }
+
+  function initDrops(count: number) {
+    while (state.drops.length < count) {
+      state.drops.push({ stats: new Set<StatKey>(), mainStat: null })
+    }
+    while (state.drops.length > count) {
+      state.drops.pop()
+    }
   }
 
   function setTimeFromNow() {
@@ -176,6 +186,7 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     if (logMode !== 'bulk') {
       logMode = 'bulk'
       setLogMode(logMode)
+      initDrops(state.dropCount)
       refreshLogModeButtons()
       refreshModeVisibility()
     }
@@ -280,35 +291,34 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
 
   formEl.appendChild(timeSection)
 
-  // ── Main Stat (Console only) ──
-  let mainStatSelect: HTMLSelectElement | null = null
+  // ── Main Stat (Console single only) ──
+  let singleMainStatSelect: HTMLSelectElement | null = null
+  const singleMainStatWrap = document.createElement('div')
+  singleMainStatWrap.className = 'flex flex-col gap-1'
   if (isConsole) {
-    const mainStatWrap = document.createElement('div')
-    mainStatWrap.className = 'flex flex-col gap-1'
-
     const mainStatLabel = document.createElement('div')
     mainStatLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider'
     mainStatLabel.textContent = 'Main Stat'
-    mainStatWrap.appendChild(mainStatLabel)
+    singleMainStatWrap.appendChild(mainStatLabel)
 
-    mainStatSelect = document.createElement('select')
-    mainStatSelect.className = 'appearance-none bg-surface-raised border border-border rounded text-text px-3 py-2 text-sm w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
+    singleMainStatSelect = document.createElement('select')
+    singleMainStatSelect.className = 'appearance-none bg-surface-raised border border-border rounded text-text px-3 py-2 text-sm w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
     const emptyOpt = document.createElement('option')
     emptyOpt.value = ''
     emptyOpt.textContent = 'Select main stat...'
-    mainStatSelect.appendChild(emptyOpt)
+    singleMainStatSelect.appendChild(emptyOpt)
     for (const stat of CONSOLE_MAIN_STAT_OPTIONS) {
       const opt = document.createElement('option')
       opt.value = stat
       opt.textContent = stat
-      mainStatSelect.appendChild(opt)
+      singleMainStatSelect.appendChild(opt)
     }
-    mainStatSelect.addEventListener('change', () => {
-      state.mainStat = mainStatSelect!.value as ConsoleMainStat || null
+    singleMainStatSelect.addEventListener('change', () => {
+      state.mainStat = singleMainStatSelect!.value as ConsoleMainStat || null
       clearError()
     })
-    mainStatWrap.appendChild(mainStatSelect)
-    formEl.appendChild(mainStatWrap)
+    singleMainStatWrap.appendChild(singleMainStatSelect)
+    formEl.appendChild(singleMainStatWrap)
   }
 
   // Team label
@@ -319,10 +329,10 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   teamInput.placeholder = 'Team / Character'
   formEl.appendChild(teamInput)
 
-  // Stat toggles
-  const statsGrid = document.createElement('div')
-  statsGrid.className = 'grid grid-cols-3 gap-1.5'
-  const statButtons = new Map<StatKey, HTMLButtonElement>()
+  // ── SINGLE: Stat toggles ──
+  const singleStatsGrid = document.createElement('div')
+  singleStatsGrid.className = 'grid grid-cols-3 gap-1.5'
+  const singleStatButtons = new Map<StatKey, HTMLButtonElement>()
 
   const statKeys = Object.keys(STAT_LABELS) as StatKey[]
   for (const key of statKeys) {
@@ -336,13 +346,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       } else {
         state.stats.add(key)
       }
-      refreshStatButtons()
+      refreshSingleStatButtons()
       clearError()
     })
-    statButtons.set(key, btn)
-    statsGrid.appendChild(btn)
+    singleStatButtons.set(key, btn)
+    singleStatsGrid.appendChild(btn)
   }
-  formEl.appendChild(statsGrid)
+  formEl.appendChild(singleStatsGrid)
 
   // Notes
   const notesInput = document.createElement('input')
@@ -352,52 +362,41 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   notesInput.placeholder = 'Notes...'
   formEl.appendChild(notesInput)
 
-  // ── Bulk-only section ──
+  // ── BULK section ──
   const bulkSection = document.createElement('div')
   bulkSection.className = 'flex flex-col gap-2'
 
-  // Add to Batch button
-  const addToBatchBtn = document.createElement('button')
-  addToBatchBtn.className = `w-full bg-surface-raised border border-border rounded py-2 text-xs font-bold cursor-pointer transition-all hover:-translate-y-0.5 ${
-    isConsole
-      ? 'text-gold-bright hover:border-gold hover:bg-gold/5'
-      : 'text-purple-bright hover:border-purple hover:bg-purple/5'
-  }`
-  addToBatchBtn.type = 'button'
-  addToBatchBtn.textContent = 'Add to Batch'
-  addToBatchBtn.addEventListener('click', handleAddToBatch)
-  bulkSection.appendChild(addToBatchBtn)
+  // Drop count input
+  const countRow = document.createElement('div')
+  countRow.className = 'flex items-center gap-2'
 
-  // Batch list
-  const batchHeader = document.createElement('div')
-  batchHeader.className = 'flex items-center justify-between'
+  const countLabel = document.createElement('label')
+  countLabel.className = 'text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
+  countLabel.textContent = 'Drops'
+  countRow.appendChild(countLabel)
 
-  const batchTitle = document.createElement('div')
-  batchTitle.className = 'text-xs font-bold text-text-muted uppercase tracking-wider'
-  batchTitle.textContent = 'Batch'
-  batchHeader.appendChild(batchTitle)
-
-  const clearBatchBtn = document.createElement('button')
-  clearBatchBtn.className = 'text-[0.65rem] text-red font-bold cursor-pointer transition-all hover:underline'
-  clearBatchBtn.type = 'button'
-  clearBatchBtn.textContent = 'Clear'
-  clearBatchBtn.addEventListener('click', () => {
-    state.batch = []
-    refreshBatchList()
+  const countInput = document.createElement('input')
+  countInput.className = 'flex-1 text-center bg-surface-raised border border-border rounded text-text px-2 py-1.5 text-sm transition-all placeholder:text-text-dim focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15'
+  countInput.type = 'number'
+  countInput.min = '1'
+  countInput.max = '20'
+  countInput.value = '5'
+  countInput.inputMode = 'numeric'
+  countInput.addEventListener('change', () => {
+    const val = clamp(parseInt(countInput.value, 10) || 1, 1, 20)
+    countInput.value = String(val)
+    state.dropCount = val
+    initDrops(val)
+    rebuildBulkDropCards()
     refreshSubmitButton()
   })
-  batchHeader.appendChild(clearBatchBtn)
+  countRow.appendChild(countInput)
+  bulkSection.appendChild(countRow)
 
-  bulkSection.appendChild(batchHeader)
-
-  const batchList = document.createElement('div')
-  batchList.className = 'flex flex-col gap-1.5 max-h-48 overflow-y-auto scrollbar-thin'
-  bulkSection.appendChild(batchList)
-
-  const batchEmpty = document.createElement('div')
-  batchEmpty.className = 'text-xs text-text-dim text-center py-2 italic'
-  batchEmpty.textContent = 'No drops queued. Select subs and click Add to Batch.'
-  batchList.appendChild(batchEmpty)
+  // Drop cards container
+  const dropsContainer = document.createElement('div')
+  dropsContainer.className = 'flex flex-col gap-2 max-h-96 overflow-y-auto scrollbar-thin pr-1'
+  bulkSection.appendChild(dropsContainer)
 
   formEl.appendChild(bulkSection)
 
@@ -465,17 +464,14 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   formEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
       e.preventDefault()
-      if (logMode === 'single') {
-        handleSubmit()
-      } else {
-        handleAddToBatch()
-      }
+      handleSubmit()
     }
   })
 
   container.appendChild(formEl)
 
   setTimeFromNow()
+  initDrops(state.dropCount)
   refreshLogModeButtons()
   refreshModeVisibility()
 
@@ -529,8 +525,8 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }
   }
 
-  function refreshStatButtons() {
-    for (const [key, btn] of statButtons.entries()) {
+  function refreshSingleStatButtons() {
+    for (const [key, btn] of singleStatButtons.entries()) {
       const active = state.stats.has(key)
       btn.classList.toggle('bg-green/18', active)
       btn.classList.toggle('text-green', active)
@@ -546,8 +542,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   function refreshModeVisibility() {
     if (logMode === 'single') {
       bulkSection.classList.add('hidden')
+      singleStatsGrid.classList.remove('hidden')
+      if (singleMainStatWrap) singleMainStatWrap.classList.remove('hidden')
     } else {
       bulkSection.classList.remove('hidden')
+      singleStatsGrid.classList.add('hidden')
+      if (singleMainStatWrap) singleMainStatWrap.classList.add('hidden')
+      rebuildBulkDropCards()
     }
     refreshSubmitButton()
   }
@@ -556,30 +557,31 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     if (logMode === 'single') {
       submitBtn.textContent = isConsole ? 'Log Console Pull' : 'Log Rewind Pull'
     } else {
-      const count = state.batch.length
-      if (count === 0) {
-        submitBtn.textContent = isConsole ? 'Log Console Pulls' : 'Log Rewind Pulls'
-      } else {
-        submitBtn.textContent = isConsole
-          ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
-          : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
-      }
+      const count = state.dropCount
+      submitBtn.textContent = isConsole
+        ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
+        : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
     }
   }
 
   function clearError() {
     errorEl.textContent = ''
     tagInput.classList.remove('border-red')
-    if (mainStatSelect) mainStatSelect.classList.remove('border-red')
+    if (singleMainStatSelect) singleMainStatSelect.classList.remove('border-red')
+    // Also clear any bulk card error borders
+    dropsContainer.querySelectorAll('.border-red').forEach((el) => el.classList.remove('border-red'))
   }
 
-  function showError(msg: string) {
+  function showError(msg: string, element?: HTMLElement | null) {
     errorEl.textContent = msg
     if (msg.toLowerCase().includes('tag')) {
       tagInput.classList.add('border-red')
     }
-    if (msg.toLowerCase().includes('main stat') && mainStatSelect) {
-      mainStatSelect.classList.add('border-red')
+    if (msg.toLowerCase().includes('main stat') && singleMainStatSelect) {
+      singleMainStatSelect.classList.add('border-red')
+    }
+    if (element) {
+      element.classList.add('border-red')
     }
   }
 
@@ -594,7 +596,110 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }, 2000)
   }
 
-  function buildPayload(drop?: BatchDrop): PullInsertPayload {
+  function rebuildBulkDropCards() {
+    dropsContainer.innerHTML = ''
+
+    for (let i = 0; i < state.drops.length; i++) {
+      const drop = state.drops[i]
+
+      const card = document.createElement('div')
+      card.className = 'bg-surface-raised border border-border rounded p-2.5 flex flex-col gap-2'
+
+      // Header
+      const header = document.createElement('div')
+      header.className = 'flex items-center justify-between'
+
+      const dropLabel = document.createElement('span')
+      dropLabel.className = 'text-xs font-extrabold text-text-muted uppercase tracking-wider'
+      dropLabel.textContent = `Drop #${i + 1}`
+      header.appendChild(dropLabel)
+
+      // Quick clear this drop
+      const clearDropBtn = document.createElement('button')
+      clearDropBtn.className = 'text-[0.6rem] text-red font-bold cursor-pointer transition-all hover:underline'
+      clearDropBtn.type = 'button'
+      clearDropBtn.textContent = 'Clear'
+      clearDropBtn.addEventListener('click', () => {
+        drop.stats.clear()
+        drop.mainStat = null
+        rebuildBulkDropCards()
+      })
+      header.appendChild(clearDropBtn)
+
+      card.appendChild(header)
+
+      // Main stat (Console only)
+      if (isConsole) {
+        const msWrap = document.createElement('div')
+        msWrap.className = 'flex flex-col gap-1'
+
+        const msLabel = document.createElement('div')
+        msLabel.className = 'text-[0.6rem] font-bold text-text-muted uppercase tracking-wider'
+        msLabel.textContent = 'Main Stat'
+        msWrap.appendChild(msLabel)
+
+        const msSelect = document.createElement('select')
+        msSelect.className = 'appearance-none bg-surface border border-border rounded text-text px-2 py-1.5 text-xs w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
+        const emptyOpt = document.createElement('option')
+        emptyOpt.value = ''
+        emptyOpt.textContent = 'Select...'
+        msSelect.appendChild(emptyOpt)
+        for (const stat of CONSOLE_MAIN_STAT_OPTIONS) {
+          const opt = document.createElement('option')
+          opt.value = stat
+          opt.textContent = stat
+          msSelect.appendChild(opt)
+        }
+        msSelect.value = drop.mainStat || ''
+        msSelect.addEventListener('change', () => {
+          drop.mainStat = msSelect.value as ConsoleMainStat || null
+          msSelect.classList.remove('border-red')
+          clearError()
+        })
+        msWrap.appendChild(msSelect)
+        card.appendChild(msWrap)
+      }
+
+      // Sub stats grid
+      const dropStatsGrid = document.createElement('div')
+      dropStatsGrid.className = 'grid grid-cols-3 gap-1'
+
+      for (const key of statKeys) {
+        const btn = document.createElement('button')
+        btn.className = 'bg-surface border border-border rounded py-1 text-[0.65rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text hover:-translate-y-px'
+        btn.type = 'button'
+        btn.textContent = STAT_LABELS[key]
+        const active = drop.stats.has(key)
+        if (active) {
+          btn.classList.remove('bg-surface', 'border-border', 'text-text-muted')
+          btn.classList.add('bg-green/18', 'text-green', 'border-green-dim', 'shadow-lg', 'shadow-green/15')
+        }
+        btn.addEventListener('click', () => {
+          if (drop.stats.has(key)) {
+            drop.stats.delete(key)
+          } else {
+            drop.stats.add(key)
+          }
+          const nowActive = drop.stats.has(key)
+          btn.classList.toggle('bg-green/18', nowActive)
+          btn.classList.toggle('text-green', nowActive)
+          btn.classList.toggle('border-green-dim', nowActive)
+          btn.classList.toggle('shadow-lg', nowActive)
+          btn.classList.toggle('shadow-green/15', nowActive)
+          btn.classList.toggle('bg-surface', !nowActive)
+          btn.classList.toggle('border-border', !nowActive)
+          btn.classList.toggle('text-text-muted', !nowActive)
+          clearError()
+        })
+        dropStatsGrid.appendChild(btn)
+      }
+
+      card.appendChild(dropStatsGrid)
+      dropsContainer.appendChild(card)
+    }
+  }
+
+  function buildPayload(drop?: DropConfig): PullInsertPayload {
     const userTag = tagInput.value.trim()
     const stats = drop ? drop.stats : state.stats
     return {
@@ -620,102 +725,6 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       has_crit_dmg: stats.has('has_crit_dmg'),
       has_break_intensity: stats.has('has_break_intensity'),
       has_cycle_intensity: stats.has('has_cycle_intensity'),
-    }
-  }
-
-  function handleAddToBatch() {
-    clearError()
-
-    if (state.stats.size === 0) {
-      showError('Select at least one substat')
-      return
-    }
-
-    if (isConsole && !state.mainStat) {
-      showError('Select a main stat')
-      return
-    }
-
-    if (state.batch.length >= 20) {
-      showError('Max 20 drops per batch')
-      return
-    }
-
-    state.batch.push({
-      stats: new Set(state.stats),
-      mainStat: state.mainStat,
-    })
-
-    // Clear current drop config for next
-    state.stats.clear()
-    refreshStatButtons()
-    if (mainStatSelect) {
-      mainStatSelect.value = ''
-      state.mainStat = null
-    }
-
-    refreshBatchList()
-    refreshSubmitButton()
-  }
-
-  function refreshBatchList() {
-    batchList.innerHTML = ''
-
-    if (state.batch.length === 0) {
-      const empty = document.createElement('div')
-      empty.className = 'text-xs text-text-dim text-center py-2 italic'
-      empty.textContent = 'No drops queued. Select subs and click Add to Batch.'
-      batchList.appendChild(empty)
-      return
-    }
-
-    for (let i = 0; i < state.batch.length; i++) {
-      const drop = state.batch[i]
-      const card = document.createElement('div')
-      card.className = 'bg-surface-raised border border-border rounded p-2 flex flex-col gap-1'
-
-      // Header row
-      const header = document.createElement('div')
-      header.className = 'flex items-center justify-between'
-
-      const dropNum = document.createElement('span')
-      dropNum.className = 'text-xs font-bold text-text-muted'
-      dropNum.textContent = `Drop #${i + 1}`
-      header.appendChild(dropNum)
-
-      const delBtn = document.createElement('button')
-      delBtn.className = 'text-[0.65rem] text-red font-bold cursor-pointer transition-all hover:underline'
-      delBtn.type = 'button'
-      delBtn.textContent = '×'
-      delBtn.addEventListener('click', () => {
-        state.batch.splice(i, 1)
-        refreshBatchList()
-        refreshSubmitButton()
-      })
-      header.appendChild(delBtn)
-
-      card.appendChild(header)
-
-      // Main stat pill (console only)
-      if (isConsole && drop.mainStat) {
-        const msPill = document.createElement('span')
-        msPill.className = 'self-start text-[0.6rem] font-bold px-1.5 py-0.5 rounded border bg-purple/10 text-purple-bright border-purple-dim'
-        msPill.textContent = drop.mainStat
-        card.appendChild(msPill)
-      }
-
-      // Sub stat pills
-      const pillsWrap = document.createElement('div')
-      pillsWrap.className = 'flex flex-wrap gap-1'
-      for (const key of drop.stats) {
-        const pill = document.createElement('span')
-        pill.className = 'text-[0.6rem] font-bold px-1.5 py-0.5 rounded border bg-green/10 text-green border-green-dim'
-        pill.textContent = STAT_LABELS[key]
-        pillsWrap.appendChild(pill)
-      }
-      card.appendChild(pillsWrap)
-
-      batchList.appendChild(card)
     }
   }
 
@@ -749,35 +758,49 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
         } else {
           await insertPull(buildPayload())
         }
+
+        state.stats.clear()
+        refreshSingleStatButtons()
+        notesInput.value = ''
+        if (singleMainStatSelect) {
+          singleMainStatSelect.value = ''
+          state.mainStat = null
+        }
       } else {
-        // Bulk mode
-        if (state.batch.length === 0) {
-          showError('Add at least one drop to the batch')
+        // Bulk mode — validate each drop
+        const invalidIndices: number[] = []
+        for (let i = 0; i < state.drops.length; i++) {
+          const drop = state.drops[i]
+          if (drop.stats.size === 0) invalidIndices.push(i)
+          if (isConsole && !drop.mainStat) invalidIndices.push(i)
+        }
+
+        if (invalidIndices.length > 0) {
+          const unique = [...new Set(invalidIndices)].map((i) => `#${i + 1}`).join(', ')
+          showError(`Missing subs or main stat in drops ${unique}`)
           return
         }
 
         if (isConsole) {
-          const payloads: ConsolePullInsertPayload[] = state.batch.map((drop) => ({
+          const payloads: ConsolePullInsertPayload[] = state.drops.map((drop) => ({
             ...buildPayload(drop),
             main_stat: drop.mainStat!,
           }))
           await insertConsolePullsBulk(payloads)
         } else {
-          const payloads: PullInsertPayload[] = state.batch.map((drop) => buildPayload(drop))
+          const payloads: PullInsertPayload[] = state.drops.map((drop) => buildPayload(drop))
           await insertPullsBulk(payloads)
         }
 
-        state.batch = []
-        refreshBatchList()
+        // Reset all drop configs
+        for (const drop of state.drops) {
+          drop.stats.clear()
+          drop.mainStat = null
+        }
+        rebuildBulkDropCards()
+        notesInput.value = ''
       }
 
-      state.stats.clear()
-      refreshStatButtons()
-      notesInput.value = ''
-      if (mainStatSelect) {
-        mainStatSelect.value = ''
-        state.mainStat = null
-      }
       showSuccess()
       callbacks.onSubmitted()
       setTimeFromNow()
