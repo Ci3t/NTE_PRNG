@@ -63,6 +63,43 @@ export const SERVER_FILTER_OPTIONS: { value: ServerRegion | 'all'; label: string
 
 export type PullMode = 'free' | 'stamina'
 
+export type LogMode = 'single' | 'bulk'
+
+export type ConsoleMainStat =
+  | 'HP Bonus'
+  | 'ATK Bonus'
+  | 'DEF Bonus'
+  | 'CRIT Rate'
+  | 'CRIT DMG'
+  | 'Cycle Intensity'
+  | 'Break Intensity'
+  | 'Healing Bonus'
+  | 'Cosmos DMG Bonus'
+  | 'Anima DMG Bonus'
+  | 'Incantation DMG Bonus'
+  | 'Chaos DMG Bonus'
+  | 'Psyche DMG Bonus'
+  | 'Lakshana DMG Bonus'
+  | 'Mental DMG Bonus'
+
+export const CONSOLE_MAIN_STAT_OPTIONS: ConsoleMainStat[] = [
+  'HP Bonus',
+  'ATK Bonus',
+  'DEF Bonus',
+  'CRIT Rate',
+  'CRIT DMG',
+  'Cycle Intensity',
+  'Break Intensity',
+  'Healing Bonus',
+  'Cosmos DMG Bonus',
+  'Anima DMG Bonus',
+  'Incantation DMG Bonus',
+  'Chaos DMG Bonus',
+  'Psyche DMG Bonus',
+  'Lakshana DMG Bonus',
+  'Mental DMG Bonus',
+]
+
 export interface PullInsertPayload {
   user_tag: string
   session_id: string
@@ -116,9 +153,13 @@ export interface PullRow {
   created_at: string
 }
 
-// Console pulls use the exact same shape (stamina/energy artifact pulls)
-export type ConsolePullInsertPayload = PullInsertPayload
-export type ConsolePullRow = PullRow
+export interface ConsolePullInsertPayload extends PullInsertPayload {
+  main_stat?: ConsoleMainStat
+}
+
+export interface ConsolePullRow extends PullRow {
+  main_stat: ConsoleMainStat | null
+}
 
 export interface SecondStatsRow {
   pull_second: SecondOption

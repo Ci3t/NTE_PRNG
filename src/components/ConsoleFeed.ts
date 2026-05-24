@@ -193,11 +193,18 @@ export function mountConsoleFeed(container: HTMLElement, _callbacks: ConsoleFeed
       const meta = document.createElement('div')
       meta.className = 'flex items-center gap-1.5 flex-wrap'
 
-      // Stamina indicator
-      const staminaPill = document.createElement('span')
-      staminaPill.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold border border-transparent bg-gold/10 text-gold-bright'
-      staminaPill.textContent = 'Stamina'
-      meta.appendChild(staminaPill)
+      // Console indicator
+      const consolePill = document.createElement('span')
+      consolePill.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold border border-transparent bg-gold/10 text-gold-bright'
+      consolePill.textContent = 'Console'
+      meta.appendChild(consolePill)
+
+      if (row.main_stat) {
+        const mainPill = document.createElement('span')
+        mainPill.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-[0.68rem] font-bold border border-transparent bg-purple/10 text-purple-bright'
+        mainPill.textContent = row.main_stat
+        meta.appendChild(mainPill)
+      }
 
       if (row.server_region) {
         const serverPill = document.createElement('span')

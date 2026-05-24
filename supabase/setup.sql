@@ -71,6 +71,12 @@ CREATE TABLE IF NOT EXISTS nte_console_pulls (
   has_crit_dmg boolean NOT NULL DEFAULT false,
   has_break_intensity boolean NOT NULL DEFAULT false,
   has_cycle_intensity boolean NOT NULL DEFAULT false,
+  main_stat text CHECK (main_stat IN (
+    'HP Bonus','ATK Bonus','DEF Bonus','CRIT Rate','CRIT DMG',
+    'Cycle Intensity','Break Intensity','Healing Bonus',
+    'Cosmos DMG Bonus','Anima DMG Bonus','Incantation DMG Bonus',
+    'Chaos DMG Bonus','Psyche DMG Bonus','Lakshana DMG Bonus','Mental DMG Bonus'
+  )),
   is_dual_crit boolean GENERATED ALWAYS AS (
     has_crit_rate AND has_crit_dmg
   ) STORED

@@ -15,19 +15,19 @@ function activeStats(row: PullRow | ConsolePullRow): string[] {
   return keys.filter((k) => (row as unknown as Record<string, boolean>)[k]).map((k) => STAT_LABELS[k])
 }
 
-function buildReport(free: PullRow[], console: ConsolePullRow[]): string {
+function buildReport(rewind: PullRow[], console: ConsolePullRow[]): string {
   const now = new Date()
   const header = `══════════════════════════════════════════════════════════════════
   NTE PRNG ANALYSIS REPORT
   Generated: ${now.toISOString()}
-  Free Pulls: ${free.length}  |  Stamina Pulls: ${console.length}
+  Rewind Pulls: ${rewind.length}  |  Console Pulls: ${console.length}
 ══════════════════════════════════════════════════════════════════\n\n`
 
   // ── Executive Summary ──
-  const freeDualCrit = free.filter((r) => r.is_dual_crit).length
-  const freeCritRate = free.filter((r) => r.has_crit_rate).length
-  const freeCritDmg = free.filter((r) => r.has_crit_dmg).length
-  const freeDmgPct = free.filter((r) => r.has_dmg_pct).length
+  const rewindDualCrit = rewind.filter((r) => r.is_dual_crit).length
+  const rewindCritRate = rewind.filter((r) => r.has_crit_rate).length
+  const rewindCritDmg = rewind.filter((r) => r.has_crit_dmg).length
+  const rewindDmgPct = rewind.filter((r) => r.has_dmg_pct).length
 
   const consoleDualCrit = console.filter((r) => r.is_dual_crit).length
   const consoleCritRate = console.filter((r) => r.has_crit_rate).length
@@ -40,20 +40,39 @@ function buildReport(free: PullRow[], console: ConsolePullRow[]): string {
   report += `┌────────────────────────────────────────────────────────────────┐\n`
   report += `│ EXECUTIVE SUMMARY                                              │\n`
   report += `├────────────────────────────────────────────────────────────────┤\n`
-  report += `│ FREE PULLS                                                     │\n`
-  report += `│   Total:        ${String(free.length).padEnd(47)}│\n`
-  report += `│   Dual CRIT:    ${String(`${freeDualCrit} (${pct(freeDualCrit, free.length)}%)`).padEnd(47)}│\n`
-  report += `│   CRIT Rate:    ${String(`${freeCritRate} (${pct(freeCritRate, free.length)}%)`).padEnd(47)}│\n`
-  report += `│   CRIT DMG:     ${String(`${freeCritDmg} (${pct(freeCritDmg, free.length)}%)`).padEnd(47)}│\n`
-  report += `│   DMG%:         ${String(`${freeDmgPct} (${pct(freeDmgPct, free.length)}%)`).padEnd(47)}│\n`
+  report += `│ REWIND PULLS                                                   │\n`
+  report += `│   Total:        ${String(rewind.length).padEnd(47)}│\n`
+  report += `│   Dual CRIT:    ${String(`${rewindDualCrit} (${pct(rewindDualCrit, rewind.length)}%)`).padEnd(47)}│\n`
+  report += `│   CRIT Rate:    ${String(`${rewindCritRate} (${pct(rewindCritRate, rewind.length)}%)`).padEnd(47)}│\n`
+  report += `│   CRIT DMG:     ${String(`${rewindCritDmg} (${pct(rewindCritDmg, rewind.length)}%)`).padEnd(47)}│\n`
+  report += `│   DMG%:         ${String(`${rewindDmgPct} (${pct(rewindDmgPct, rewind.length)}%)`).padEnd(47)}│\n`
   report += `├────────────────────────────────────────────────────────────────┤\n`
-  report += `│ STAMINA PULLS                                                  │\n`
+  report += `│ CONSOLE PULLS                                                  │\n`
   report += `│   Total:        ${String(console.length).padEnd(47)}│\n`
   report += `│   Dual CRIT:    ${String(`${consoleDualCrit} (${pct(consoleDualCrit, console.length)}%)`).padEnd(47)}│\n`
   report += `│   CRIT Rate:    ${String(`${consoleCritRate} (${pct(consoleCritRate, console.length)}%)`).padEnd(47)}│\n`
   report += `│   CRIT DMG:     ${String(`${consoleCritDmg} (${pct(consoleCritDmg, console.length)}%)`).padEnd(47)}│\n`
   report += `│   DMG%:         ${String(`${consoleDmgPct} (${pct(consoleDmgPct, console.length)}%)`).padEnd(47)}│\n`
   report += `└────────────────────────────────────────────────────────────────┘\n\n`
+
+  // ── Console Main Stat Breakdown ──
+  if (console.length > 0) {
+    const mainStatCounts = new Map<string, number>()
+    for (const r of console) {
+      if (r.main_stat) {
+        mainStatCounts.set(r.main_stat, (mainStatCounts.get(r.main_stat) || 0) + 1)
+      }
+    }
+    if (mainStatCounts.size > 0) {
+      report += `\nCONSOLE — MAIN STAT DISTRIBUTION\n`
+      report += `──────────────────────────────────────────────────────────────────\n`
+      const sorted = Array.from(mainStatCounts.entries()).sort((a, b) => b[1] - a[1])
+      for (const [stat, count] of sorted) {
+        report += ` ${stat.padEnd(24)} ${String(count).padEnd(6)} ${pct(count, console.length)}%\n`
+      }
+      report += '\n'
+    }
+  }
 
   // ── Helper to build per-second table ──
   function buildSecondTable(rows: (PullRow | ConsolePullRow)[], label: string): string {
@@ -105,8 +124,8 @@ function buildReport(free: PullRow[], console: ConsolePullRow[]): string {
     return out + '\n'
   }
 
-  report += buildSecondTable(free, 'FREE PULLS')
-  report += buildSecondTable(console, 'STAMINA PULLS')
+  report += buildSecondTable(rewind, 'REWIND PULLS')
+  report += buildSecondTable(console, 'CONSOLE PULLS')
 
   // ── Per-Hour Breakdown ──
   function buildHourTable(rows: (PullRow | ConsolePullRow)[], label: string): string {
@@ -138,8 +157,8 @@ function buildReport(free: PullRow[], console: ConsolePullRow[]): string {
     return out + '\n'
   }
 
-  report += buildHourTable(free, 'FREE PULLS')
-  report += buildHourTable(console, 'STAMINA PULLS')
+  report += buildHourTable(rewind, 'REWIND PULLS')
+  report += buildHourTable(console, 'CONSOLE PULLS')
 
   // ── Per-Server Breakdown ──
   function buildServerTable(rows: (PullRow | ConsolePullRow)[], label: string): string {
@@ -161,57 +180,58 @@ function buildReport(free: PullRow[], console: ConsolePullRow[]): string {
     return out + '\n'
   }
 
-  report += buildServerTable(free, 'FREE PULLS')
-  report += buildServerTable(console, 'STAMINA PULLS')
+  report += buildServerTable(rewind, 'REWIND PULLS')
+  report += buildServerTable(console, 'CONSOLE PULLS')
 
   // ── Side-by-Side Comparison ──
   report += `\n══════════════════════════════════════════════════════════════════\n`
   report += `  SIDE-BY-SIDE COMPARISON (Seconds with 3+ pulls in both modes)\n`
   report += `══════════════════════════════════════════════════════════════════\n\n`
-  report += `Second  Free-DC%  Stam-DC%  Winner    Free-N  Stam-N\n`
+  report += `Second  Rewind-DC%  Console-DC%  Winner    Rewind-N  Console-N\n`
   report += `──────────────────────────────────────────────────────────────────\n`
 
   for (const sec of SECOND_OPTIONS) {
-    const fRows = free.filter((r) => r.pull_second === sec)
+    const rRows = rewind.filter((r) => r.pull_second === sec)
     const cRows = console.filter((r) => r.pull_second === sec)
-    if (fRows.length < 3 && cRows.length < 3) continue
+    if (rRows.length < 3 && cRows.length < 3) continue
 
-    const fDc = fRows.length > 0 ? ((fRows.filter((r) => r.is_dual_crit).length / fRows.length) * 100).toFixed(1) : '—'
+    const rDc = rRows.length > 0 ? ((rRows.filter((r) => r.is_dual_crit).length / rRows.length) * 100).toFixed(1) : '—'
     const cDc = cRows.length > 0 ? ((cRows.filter((r) => r.is_dual_crit).length / cRows.length) * 100).toFixed(1) : '—'
 
     let winner = '—'
-    if (fRows.length >= 3 && cRows.length >= 3) {
-      const fVal = parseFloat(fDc)
+    if (rRows.length >= 3 && cRows.length >= 3) {
+      const rVal = parseFloat(rDc)
       const cVal = parseFloat(cDc)
-      winner = fVal > cVal ? 'FREE' : cVal > fVal ? 'STAMINA' : 'TIE'
+      winner = rVal > cVal ? 'REWIND' : cVal > rVal ? 'CONSOLE' : 'TIE'
     }
 
-    report += ` :${pad(sec)}    ${String(fDc).padEnd(9)} ${String(cDc).padEnd(9)} ${String(winner).padEnd(9)} ${String(fRows.length).padEnd(7)} ${cRows.length}\n`
+    report += ` :${pad(sec)}    ${String(rDc).padEnd(11)} ${String(cDc).padEnd(13)} ${String(winner).padEnd(9)} ${String(rRows.length).padEnd(9)} ${cRows.length}\n`
   }
 
   // ── Raw Data ──
   report += `\n\n══════════════════════════════════════════════════════════════════\n`
-  report += `  RAW DATA — FREE PULLS (newest first)\n`
+  report += `  RAW DATA — REWIND PULLS (newest first)\n`
   report += `══════════════════════════════════════════════════════════════════\n\n`
   report += `#   Date/Time(Server)    User      :SS   Server  Source  Stats\n`
   report += `──────────────────────────────────────────────────────────────────\n`
 
-  for (let i = 0; i < free.length; i++) {
-    const r = free[i]
+  for (let i = 0; i < rewind.length; i++) {
+    const r = rewind[i]
     const stats = activeStats(r).join(', ')
     report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(7)} ${stats}\n`
   }
 
   report += `\n\n══════════════════════════════════════════════════════════════════\n`
-  report += `  RAW DATA — STAMINA PULLS (newest first)\n`
+  report += `  RAW DATA — CONSOLE PULLS (newest first)\n`
   report += `══════════════════════════════════════════════════════════════════\n\n`
-  report += `#   Date/Time(Server)    User      :SS   Server  Source  Stats\n`
+  report += `#   Date/Time(Server)    User      :SS   Server  Source  Main Stat              Stats\n`
   report += `──────────────────────────────────────────────────────────────────\n`
 
   for (let i = 0; i < console.length; i++) {
     const r = console[i]
     const stats = activeStats(r).join(', ')
-    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(7)} ${stats}\n`
+    const main = r.main_stat ?? '—'
+    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(7)} ${main.padEnd(22)} ${stats}\n`
   }
 
   report += `\n\n══════════════════════════════════════════════════════════════════\n`
@@ -253,12 +273,12 @@ export function mountExportButton(container: HTMLElement) {
     btn.classList.add('opacity-50')
 
     try {
-      const [free, console] = await Promise.all([
+      const [rewind, console] = await Promise.all([
         fetchAllPulls('all', 'all', 5000, true),
         fetchAllConsolePulls('all', 'all', 5000, true),
       ])
 
-      const report = buildReport(free, console)
+      const report = buildReport(rewind, console)
       const timestamp = new Date().toISOString().replace(/[:T]/g, '-').split('.')[0]
       triggerDownload(`NTE_PRNG_Report_${timestamp}.txt`, report)
     } catch (err) {

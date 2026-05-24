@@ -79,34 +79,34 @@ if (!isSupabaseConfigured()) {
   title.textContent = 'NTE PRNG Logger'
   leftHeader.appendChild(title)
 
-  // Mode toggle
+  // Mode toggle: Rewind / Console
   const modeToggle = document.createElement('div')
   modeToggle.className = 'flex items-center gap-1 bg-surface-raised border border-border rounded p-0.5'
 
-  const freeBtn = document.createElement('button')
-  freeBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
-  freeBtn.textContent = 'FREE'
-  freeBtn.type = 'button'
+  const rewindBtn = document.createElement('button')
+  rewindBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  rewindBtn.textContent = 'Rewind'
+  rewindBtn.type = 'button'
 
-  const staminaBtn = document.createElement('button')
-  staminaBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
-  staminaBtn.textContent = 'STAMINA'
-  staminaBtn.type = 'button'
+  const consoleBtn = document.createElement('button')
+  consoleBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  consoleBtn.textContent = 'Console'
+  consoleBtn.type = 'button'
 
   function refreshModeButtons() {
-    const freeActive = currentMode === 'free'
-    freeBtn.classList.toggle('bg-purple', freeActive)
-    freeBtn.classList.toggle('text-white', freeActive)
-    freeBtn.classList.toggle('shadow-sm', freeActive)
-    freeBtn.classList.toggle('text-text-muted', !freeActive)
+    const rewindActive = currentMode === 'free'
+    rewindBtn.classList.toggle('bg-purple', rewindActive)
+    rewindBtn.classList.toggle('text-white', rewindActive)
+    rewindBtn.classList.toggle('shadow-sm', rewindActive)
+    rewindBtn.classList.toggle('text-text-muted', !rewindActive)
 
-    staminaBtn.classList.toggle('bg-gold', !freeActive)
-    staminaBtn.classList.toggle('text-white', !freeActive)
-    staminaBtn.classList.toggle('shadow-sm', !freeActive)
-    staminaBtn.classList.toggle('text-text-muted', freeActive)
+    consoleBtn.classList.toggle('bg-gold', !rewindActive)
+    consoleBtn.classList.toggle('text-white', !rewindActive)
+    consoleBtn.classList.toggle('shadow-sm', !rewindActive)
+    consoleBtn.classList.toggle('text-text-muted', rewindActive)
   }
 
-  freeBtn.addEventListener('click', () => {
+  rewindBtn.addEventListener('click', () => {
     if (currentMode !== 'free') {
       currentMode = 'free'
       setPullMode(currentMode)
@@ -115,7 +115,7 @@ if (!isSupabaseConfigured()) {
     }
   })
 
-  staminaBtn.addEventListener('click', () => {
+  consoleBtn.addEventListener('click', () => {
     if (currentMode !== 'stamina') {
       currentMode = 'stamina'
       setPullMode(currentMode)
@@ -124,8 +124,8 @@ if (!isSupabaseConfigured()) {
     }
   })
 
-  modeToggle.appendChild(freeBtn)
-  modeToggle.appendChild(staminaBtn)
+  modeToggle.appendChild(rewindBtn)
+  modeToggle.appendChild(consoleBtn)
   leftHeader.appendChild(modeToggle)
 
   header.appendChild(leftHeader)

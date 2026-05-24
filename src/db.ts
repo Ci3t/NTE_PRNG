@@ -70,46 +70,67 @@ const insertTimestamps: number[] = []
 const MAX_INSERTS_PER_MINUTE = 10
 const MIN_INSERT_INTERVAL_MS = 3000
 
-export async function insertPull(data: PullInsertPayload): Promise<void> {
+function checkRateLimit(count = 1): void {
   const now = Date.now()
   const oneMinuteAgo = now - 60000
   while (insertTimestamps.length > 0 && insertTimestamps[0] < oneMinuteAgo) {
     insertTimestamps.shift()
   }
-  if (insertTimestamps.length >= MAX_INSERTS_PER_MINUTE) {
-    throw new Error('Rate limit: max 10 pulls per minute. Please slow down.')
+  if (insertTimestamps.length + count > MAX_INSERTS_PER_MINUTE) {
+    throw new Error(`Rate limit: max ${MAX_INSERTS_PER_MINUTE} pulls per minute. Please slow down.`)
   }
   if (insertTimestamps.length > 0 && now - insertTimestamps[insertTimestamps.length - 1] < MIN_INSERT_INTERVAL_MS) {
     throw new Error('Please wait a few seconds between submissions.')
   }
+}
 
+function recordInserts(count: number): void {
+  const now = Date.now()
+  for (let i = 0; i < count; i++) {
+    insertTimestamps.push(now)
+  }
+}
+
+export async function insertPull(data: PullInsertPayload): Promise<void> {
+  checkRateLimit(1)
   const supabase = getSupabaseClient()
   const { error } = await supabase.from('nte_pulls').insert(data)
   if (error) {
     throw new Error(error.message)
   }
-  insertTimestamps.push(now)
+  recordInserts(1)
+}
+
+export async function insertPullsBulk(data: PullInsertPayload[]): Promise<void> {
+  if (data.length === 0) return
+  checkRateLimit(data.length)
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from('nte_pulls').insert(data)
+  if (error) {
+    throw new Error(error.message)
+  }
+  recordInserts(data.length)
 }
 
 export async function insertConsolePull(data: ConsolePullInsertPayload): Promise<void> {
-  const now = Date.now()
-  const oneMinuteAgo = now - 60000
-  while (insertTimestamps.length > 0 && insertTimestamps[0] < oneMinuteAgo) {
-    insertTimestamps.shift()
-  }
-  if (insertTimestamps.length >= MAX_INSERTS_PER_MINUTE) {
-    throw new Error('Rate limit: max 10 pulls per minute. Please slow down.')
-  }
-  if (insertTimestamps.length > 0 && now - insertTimestamps[insertTimestamps.length - 1] < MIN_INSERT_INTERVAL_MS) {
-    throw new Error('Please wait a few seconds between submissions.')
-  }
-
+  checkRateLimit(1)
   const supabase = getSupabaseClient()
   const { error } = await supabase.from('nte_console_pulls').insert(data)
   if (error) {
     throw new Error(error.message)
   }
-  insertTimestamps.push(now)
+  recordInserts(1)
+}
+
+export async function insertConsolePullsBulk(data: ConsolePullInsertPayload[]): Promise<void> {
+  if (data.length === 0) return
+  checkRateLimit(data.length)
+  const supabase = getSupabaseClient()
+  const { error } = await supabase.from('nte_console_pulls').insert(data)
+  if (error) {
+    throw new Error(error.message)
+  }
+  recordInserts(data.length)
 }
 
 // ── Per-function fetch rate limiting ──
