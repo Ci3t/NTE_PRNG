@@ -60,6 +60,11 @@ export interface LogFormProps {
   mode: PullMode
 }
 
+interface BatchDrop {
+  stats: Set<StatKey>
+  mainStat: ConsoleMainStat | null
+}
+
 export function mountLogForm(container: HTMLElement, props: LogFormProps, callbacks: LogFormCallbacks) {
   const mode = props.mode
   const isConsole = mode === 'stamina'
@@ -75,7 +80,7 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     clientAt: '',
     offset: 0,
     mainStat: null as ConsoleMainStat | null,
-    bulkCount: 1,
+    batch: [] as BatchDrop[],
   }
 
   function setTimeFromNow() {
@@ -351,35 +356,49 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   const bulkSection = document.createElement('div')
   bulkSection.className = 'flex flex-col gap-2'
 
-  const bulkCountRow = document.createElement('div')
-  bulkCountRow.className = 'flex items-center gap-2'
+  // Add to Batch button
+  const addToBatchBtn = document.createElement('button')
+  addToBatchBtn.className = `w-full bg-surface-raised border border-border rounded py-2 text-xs font-bold cursor-pointer transition-all hover:-translate-y-0.5 ${
+    isConsole
+      ? 'text-gold-bright hover:border-gold hover:bg-gold/5'
+      : 'text-purple-bright hover:border-purple hover:bg-purple/5'
+  }`
+  addToBatchBtn.type = 'button'
+  addToBatchBtn.textContent = 'Add to Batch'
+  addToBatchBtn.addEventListener('click', handleAddToBatch)
+  bulkSection.appendChild(addToBatchBtn)
 
-  const bulkCountLabel = document.createElement('label')
-  bulkCountLabel.className = 'text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
-  bulkCountLabel.textContent = 'Count'
-  bulkCountRow.appendChild(bulkCountLabel)
+  // Batch list
+  const batchHeader = document.createElement('div')
+  batchHeader.className = 'flex items-center justify-between'
 
-  const bulkCountInput = document.createElement('input')
-  bulkCountInput.className = 'flex-1 text-center bg-surface-raised border border-border rounded text-text px-2 py-1.5 text-sm transition-all placeholder:text-text-dim focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15'
-  bulkCountInput.type = 'number'
-  bulkCountInput.min = '1'
-  bulkCountInput.max = '20'
-  bulkCountInput.value = '1'
-  bulkCountInput.inputMode = 'numeric'
-  bulkCountInput.addEventListener('change', () => {
-    state.bulkCount = clamp(parseInt(bulkCountInput.value, 10) || 1, 1, 20)
-    bulkCountInput.value = String(state.bulkCount)
+  const batchTitle = document.createElement('div')
+  batchTitle.className = 'text-xs font-bold text-text-muted uppercase tracking-wider'
+  batchTitle.textContent = 'Batch'
+  batchHeader.appendChild(batchTitle)
+
+  const clearBatchBtn = document.createElement('button')
+  clearBatchBtn.className = 'text-[0.65rem] text-red font-bold cursor-pointer transition-all hover:underline'
+  clearBatchBtn.type = 'button'
+  clearBatchBtn.textContent = 'Clear'
+  clearBatchBtn.addEventListener('click', () => {
+    state.batch = []
+    refreshBatchList()
     refreshSubmitButton()
-    clearError()
   })
-  bulkCountRow.appendChild(bulkCountInput)
+  batchHeader.appendChild(clearBatchBtn)
 
-  const bulkHint = document.createElement('div')
-  bulkHint.className = 'text-[0.65rem] text-text-dim'
-  bulkHint.textContent = 'All drops share the same time, subs, and main stat.'
+  bulkSection.appendChild(batchHeader)
 
-  bulkSection.appendChild(bulkCountRow)
-  bulkSection.appendChild(bulkHint)
+  const batchList = document.createElement('div')
+  batchList.className = 'flex flex-col gap-1.5 max-h-48 overflow-y-auto scrollbar-thin'
+  bulkSection.appendChild(batchList)
+
+  const batchEmpty = document.createElement('div')
+  batchEmpty.className = 'text-xs text-text-dim text-center py-2 italic'
+  batchEmpty.textContent = 'No drops queued. Select subs and click Add to Batch.'
+  batchList.appendChild(batchEmpty)
+
   formEl.appendChild(bulkSection)
 
   // Submit area
@@ -446,7 +465,11 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   formEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !(e.target instanceof HTMLTextAreaElement)) {
       e.preventDefault()
-      handleSubmit()
+      if (logMode === 'single') {
+        handleSubmit()
+      } else {
+        handleAddToBatch()
+      }
     }
   })
 
@@ -533,10 +556,14 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     if (logMode === 'single') {
       submitBtn.textContent = isConsole ? 'Log Console Pull' : 'Log Rewind Pull'
     } else {
-      const count = state.bulkCount
-      submitBtn.textContent = isConsole
-        ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
-        : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
+      const count = state.batch.length
+      if (count === 0) {
+        submitBtn.textContent = isConsole ? 'Log Console Pulls' : 'Log Rewind Pulls'
+      } else {
+        submitBtn.textContent = isConsole
+          ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
+          : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
+      }
     }
   }
 
@@ -567,8 +594,9 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }, 2000)
   }
 
-  function buildPayload(): PullInsertPayload {
+  function buildPayload(drop?: BatchDrop): PullInsertPayload {
     const userTag = tagInput.value.trim()
+    const stats = drop ? drop.stats : state.stats
     return {
       user_tag: userTag,
       session_id: getSessionId(),
@@ -581,17 +609,113 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       timezone_offset_minutes: state.offset,
       team_label: teamInput.value.trim() || undefined,
       notes: notesInput.value.trim() || undefined,
-      has_flat_hp: state.stats.has('has_flat_hp'),
-      has_flat_atk: state.stats.has('has_flat_atk'),
-      has_flat_def: state.stats.has('has_flat_def'),
-      has_hp_pct: state.stats.has('has_hp_pct'),
-      has_atk_pct: state.stats.has('has_atk_pct'),
-      has_def_pct: state.stats.has('has_def_pct'),
-      has_dmg_pct: state.stats.has('has_dmg_pct'),
-      has_crit_rate: state.stats.has('has_crit_rate'),
-      has_crit_dmg: state.stats.has('has_crit_dmg'),
-      has_break_intensity: state.stats.has('has_break_intensity'),
-      has_cycle_intensity: state.stats.has('has_cycle_intensity'),
+      has_flat_hp: stats.has('has_flat_hp'),
+      has_flat_atk: stats.has('has_flat_atk'),
+      has_flat_def: stats.has('has_flat_def'),
+      has_hp_pct: stats.has('has_hp_pct'),
+      has_atk_pct: stats.has('has_atk_pct'),
+      has_def_pct: stats.has('has_def_pct'),
+      has_dmg_pct: stats.has('has_dmg_pct'),
+      has_crit_rate: stats.has('has_crit_rate'),
+      has_crit_dmg: stats.has('has_crit_dmg'),
+      has_break_intensity: stats.has('has_break_intensity'),
+      has_cycle_intensity: stats.has('has_cycle_intensity'),
+    }
+  }
+
+  function handleAddToBatch() {
+    clearError()
+
+    if (state.stats.size === 0) {
+      showError('Select at least one substat')
+      return
+    }
+
+    if (isConsole && !state.mainStat) {
+      showError('Select a main stat')
+      return
+    }
+
+    if (state.batch.length >= 20) {
+      showError('Max 20 drops per batch')
+      return
+    }
+
+    state.batch.push({
+      stats: new Set(state.stats),
+      mainStat: state.mainStat,
+    })
+
+    // Clear current drop config for next
+    state.stats.clear()
+    refreshStatButtons()
+    if (mainStatSelect) {
+      mainStatSelect.value = ''
+      state.mainStat = null
+    }
+
+    refreshBatchList()
+    refreshSubmitButton()
+  }
+
+  function refreshBatchList() {
+    batchList.innerHTML = ''
+
+    if (state.batch.length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'text-xs text-text-dim text-center py-2 italic'
+      empty.textContent = 'No drops queued. Select subs and click Add to Batch.'
+      batchList.appendChild(empty)
+      return
+    }
+
+    for (let i = 0; i < state.batch.length; i++) {
+      const drop = state.batch[i]
+      const card = document.createElement('div')
+      card.className = 'bg-surface-raised border border-border rounded p-2 flex flex-col gap-1'
+
+      // Header row
+      const header = document.createElement('div')
+      header.className = 'flex items-center justify-between'
+
+      const dropNum = document.createElement('span')
+      dropNum.className = 'text-xs font-bold text-text-muted'
+      dropNum.textContent = `Drop #${i + 1}`
+      header.appendChild(dropNum)
+
+      const delBtn = document.createElement('button')
+      delBtn.className = 'text-[0.65rem] text-red font-bold cursor-pointer transition-all hover:underline'
+      delBtn.type = 'button'
+      delBtn.textContent = '×'
+      delBtn.addEventListener('click', () => {
+        state.batch.splice(i, 1)
+        refreshBatchList()
+        refreshSubmitButton()
+      })
+      header.appendChild(delBtn)
+
+      card.appendChild(header)
+
+      // Main stat pill (console only)
+      if (isConsole && drop.mainStat) {
+        const msPill = document.createElement('span')
+        msPill.className = 'self-start text-[0.6rem] font-bold px-1.5 py-0.5 rounded border bg-purple/10 text-purple-bright border-purple-dim'
+        msPill.textContent = drop.mainStat
+        card.appendChild(msPill)
+      }
+
+      // Sub stat pills
+      const pillsWrap = document.createElement('div')
+      pillsWrap.className = 'flex flex-wrap gap-1'
+      for (const key of drop.stats) {
+        const pill = document.createElement('span')
+        pill.className = 'text-[0.6rem] font-bold px-1.5 py-0.5 rounded border bg-green/10 text-green border-green-dim'
+        pill.textContent = STAT_LABELS[key]
+        pillsWrap.appendChild(pill)
+      }
+      card.appendChild(pillsWrap)
+
+      batchList.appendChild(card)
     }
   }
 
@@ -605,18 +729,17 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       return
     }
 
-    if (state.stats.size === 0) {
-      showError('Select at least one substat')
-      return
-    }
-
-    if (isConsole && !state.mainStat) {
-      showError('Select a main stat')
-      return
-    }
-
     try {
       if (logMode === 'single') {
+        if (state.stats.size === 0) {
+          showError('Select at least one substat')
+          return
+        }
+        if (isConsole && !state.mainStat) {
+          showError('Select a main stat')
+          return
+        }
+
         if (isConsole) {
           const payload: ConsolePullInsertPayload = {
             ...buildPayload(),
@@ -628,24 +751,24 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
         }
       } else {
         // Bulk mode
-        const base = buildPayload()
-        const count = state.bulkCount
+        if (state.batch.length === 0) {
+          showError('Add at least one drop to the batch')
+          return
+        }
+
         if (isConsole) {
-          const payloads: ConsolePullInsertPayload[] = []
-          for (let i = 0; i < count; i++) {
-            payloads.push({
-              ...base,
-              main_stat: state.mainStat!,
-            })
-          }
+          const payloads: ConsolePullInsertPayload[] = state.batch.map((drop) => ({
+            ...buildPayload(drop),
+            main_stat: drop.mainStat!,
+          }))
           await insertConsolePullsBulk(payloads)
         } else {
-          const payloads: PullInsertPayload[] = []
-          for (let i = 0; i < count; i++) {
-            payloads.push(base)
-          }
+          const payloads: PullInsertPayload[] = state.batch.map((drop) => buildPayload(drop))
           await insertPullsBulk(payloads)
         }
+
+        state.batch = []
+        refreshBatchList()
       }
 
       state.stats.clear()

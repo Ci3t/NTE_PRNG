@@ -67,7 +67,7 @@ export function getDateRange(filter: DateFilter): { start: string; end: string }
 
 // ── Insert rate limiting ──
 const insertTimestamps: number[] = []
-const MAX_INSERTS_PER_MINUTE = 10
+const MAX_INSERTS_PER_MINUTE = 30
 const MIN_INSERT_INTERVAL_MS = 3000
 
 function checkRateLimit(count = 1): void {
