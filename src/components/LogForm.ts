@@ -61,6 +61,9 @@ export interface LogFormProps {
 }
 
 interface DropConfig {
+  hour: number
+  minute: number
+  second: number
   stats: Set<StatKey>
   mainStat: ConsoleMainStat | null
 }
@@ -81,12 +84,20 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     offset: 0,
     mainStat: null as ConsoleMainStat | null,
     dropCount: 5,
+    stackCount: 10,
     drops: [] as DropConfig[],
   }
 
   function initDrops(count: number) {
+    const now = getNowParts()
     while (state.drops.length < count) {
-      state.drops.push({ stats: new Set<StatKey>(), mainStat: null })
+      state.drops.push({
+        hour: state.hour || now.hour,
+        minute: state.minute || now.minute,
+        second: state.second || now.second,
+        stats: new Set<StatKey>(),
+        mainStat: null,
+      })
     }
     while (state.drops.length > count) {
       state.drops.pop()
@@ -105,6 +116,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     refreshTimeDisplay()
     refreshInputs()
     refreshSecondButtons()
+    // Also update bulk drop times to current
+    for (const drop of state.drops) {
+      drop.hour = now.hour
+      drop.minute = now.minute
+      drop.second = now.second
+    }
+    if (logMode === 'bulk') rebuildBulkDropCards()
   }
 
   function markManual() {
@@ -143,7 +161,7 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   dateDisplay.textContent = formatDateLabel()
   formEl.appendChild(dateDisplay)
 
-  // Single / Bulk toggle
+  // ── Mode toggle: Single | Bulk | x10 ──
   const modeToggleRow = document.createElement('div')
   modeToggleRow.className = 'flex items-center justify-center'
 
@@ -160,17 +178,27 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   bulkBtn.textContent = 'Bulk'
   bulkBtn.type = 'button'
 
-  function refreshLogModeButtons() {
-    const singleActive = logMode === 'single'
-    singleBtn.classList.toggle('bg-purple', singleActive)
-    singleBtn.classList.toggle('text-white', singleActive)
-    singleBtn.classList.toggle('shadow-sm', singleActive)
-    singleBtn.classList.toggle('text-text-muted', !singleActive)
+  const stackBtn = document.createElement('button')
+  stackBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  stackBtn.textContent = '×10'
+  stackBtn.type = 'button'
 
-    bulkBtn.classList.toggle('bg-gold', !singleActive)
-    bulkBtn.classList.toggle('text-white', !singleActive)
-    bulkBtn.classList.toggle('shadow-sm', !singleActive)
-    bulkBtn.classList.toggle('text-text-muted', singleActive)
+  function refreshLogModeButtons() {
+    const m = logMode
+    singleBtn.classList.toggle('bg-purple', m === 'single')
+    singleBtn.classList.toggle('text-white', m === 'single')
+    singleBtn.classList.toggle('shadow-sm', m === 'single')
+    singleBtn.classList.toggle('text-text-muted', m !== 'single')
+
+    bulkBtn.classList.toggle('bg-gold', m === 'bulk')
+    bulkBtn.classList.toggle('text-white', m === 'bulk')
+    bulkBtn.classList.toggle('shadow-sm', m === 'bulk')
+    bulkBtn.classList.toggle('text-text-muted', m !== 'bulk')
+
+    stackBtn.classList.toggle('bg-green', m === 'stack')
+    stackBtn.classList.toggle('text-white', m === 'stack')
+    stackBtn.classList.toggle('shadow-sm', m === 'stack')
+    stackBtn.classList.toggle('text-text-muted', m !== 'stack')
   }
 
   singleBtn.addEventListener('click', () => {
@@ -192,8 +220,18 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }
   })
 
+  stackBtn.addEventListener('click', () => {
+    if (logMode !== 'stack') {
+      logMode = 'stack'
+      setLogMode(logMode)
+      refreshLogModeButtons()
+      refreshModeVisibility()
+    }
+  })
+
   modeToggle.appendChild(singleBtn)
   modeToggle.appendChild(bulkBtn)
+  modeToggle.appendChild(stackBtn)
   modeToggleRow.appendChild(modeToggle)
   formEl.appendChild(modeToggleRow)
 
@@ -225,16 +263,14 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   })
   formEl.appendChild(serverSelect)
 
-  // ── Shared Time Section ──
+  // ── Shared Time Section (Single + Stack only) ──
   const timeSection = document.createElement('div')
   timeSection.className = 'flex flex-col gap-2'
 
-  // Time display
   const timeDisplay = document.createElement('div')
   timeDisplay.className = 'tabular-nums font-extrabold text-2xl tracking-wide text-text text-center py-2 bg-surface-raised rounded border border-border font-[var(--font-mono)] shadow-inner'
   timeSection.appendChild(timeDisplay)
 
-  // Time controls row
   const timeRow = document.createElement('div')
   timeRow.className = 'flex gap-2 items-center'
 
@@ -291,34 +327,34 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
 
   formEl.appendChild(timeSection)
 
-  // ── Main Stat (Console single only) ──
-  let singleMainStatSelect: HTMLSelectElement | null = null
-  const singleMainStatWrap = document.createElement('div')
-  singleMainStatWrap.className = 'flex flex-col gap-1'
+  // ── Shared Main Stat (Console, Single + Stack only) ──
+  let sharedMainStatSelect: HTMLSelectElement | null = null
+  const sharedMainStatWrap = document.createElement('div')
+  sharedMainStatWrap.className = 'flex flex-col gap-1'
   if (isConsole) {
     const mainStatLabel = document.createElement('div')
     mainStatLabel.className = 'text-[0.65rem] font-bold text-text-muted uppercase tracking-wider'
     mainStatLabel.textContent = 'Main Stat'
-    singleMainStatWrap.appendChild(mainStatLabel)
+    sharedMainStatWrap.appendChild(mainStatLabel)
 
-    singleMainStatSelect = document.createElement('select')
-    singleMainStatSelect.className = 'appearance-none bg-surface-raised border border-border rounded text-text px-3 py-2 text-sm w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
+    sharedMainStatSelect = document.createElement('select')
+    sharedMainStatSelect.className = 'appearance-none bg-surface-raised border border-border rounded text-text px-3 py-2 text-sm w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
     const emptyOpt = document.createElement('option')
     emptyOpt.value = ''
     emptyOpt.textContent = 'Select main stat...'
-    singleMainStatSelect.appendChild(emptyOpt)
+    sharedMainStatSelect.appendChild(emptyOpt)
     for (const stat of CONSOLE_MAIN_STAT_OPTIONS) {
       const opt = document.createElement('option')
       opt.value = stat
       opt.textContent = stat
-      singleMainStatSelect.appendChild(opt)
+      sharedMainStatSelect.appendChild(opt)
     }
-    singleMainStatSelect.addEventListener('change', () => {
-      state.mainStat = singleMainStatSelect!.value as ConsoleMainStat || null
+    sharedMainStatSelect.addEventListener('change', () => {
+      state.mainStat = sharedMainStatSelect!.value as ConsoleMainStat || null
       clearError()
     })
-    singleMainStatWrap.appendChild(singleMainStatSelect)
-    formEl.appendChild(singleMainStatWrap)
+    sharedMainStatWrap.appendChild(sharedMainStatSelect)
+    formEl.appendChild(sharedMainStatWrap)
   }
 
   // Team label
@@ -329,10 +365,10 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   teamInput.placeholder = 'Team / Character'
   formEl.appendChild(teamInput)
 
-  // ── SINGLE: Stat toggles ──
-  const singleStatsGrid = document.createElement('div')
-  singleStatsGrid.className = 'grid grid-cols-3 gap-1.5'
-  const singleStatButtons = new Map<StatKey, HTMLButtonElement>()
+  // ── Shared Stats Grid (Single + Stack only) ──
+  const sharedStatsGrid = document.createElement('div')
+  sharedStatsGrid.className = 'grid grid-cols-3 gap-1.5'
+  const sharedStatButtons = new Map<StatKey, HTMLButtonElement>()
 
   const statKeys = Object.keys(STAT_LABELS) as StatKey[]
   for (const key of statKeys) {
@@ -346,13 +382,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       } else {
         state.stats.add(key)
       }
-      refreshSingleStatButtons()
+      refreshSharedStatButtons()
       clearError()
     })
-    singleStatButtons.set(key, btn)
-    singleStatsGrid.appendChild(btn)
+    sharedStatButtons.set(key, btn)
+    sharedStatsGrid.appendChild(btn)
   }
-  formEl.appendChild(singleStatsGrid)
+  formEl.appendChild(sharedStatsGrid)
 
   // Notes
   const notesInput = document.createElement('input')
@@ -362,11 +398,46 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   notesInput.placeholder = 'Notes...'
   formEl.appendChild(notesInput)
 
-  // ── BULK section ──
+  // ── Stack section (Stack only) ──
+  const stackSection = document.createElement('div')
+  stackSection.className = 'flex flex-col gap-2'
+
+  const stackCountRow = document.createElement('div')
+  stackCountRow.className = 'flex items-center gap-2'
+
+  const stackCountLabel = document.createElement('label')
+  stackCountLabel.className = 'text-xs font-bold text-text-muted uppercase tracking-wider whitespace-nowrap'
+  stackCountLabel.textContent = 'Count'
+  stackCountRow.appendChild(stackCountLabel)
+
+  const stackCountInput = document.createElement('input')
+  stackCountInput.className = 'flex-1 text-center bg-surface-raised border border-border rounded text-text px-2 py-1.5 text-sm transition-all placeholder:text-text-dim focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15'
+  stackCountInput.type = 'number'
+  stackCountInput.min = '1'
+  stackCountInput.max = '20'
+  stackCountInput.value = '10'
+  stackCountInput.inputMode = 'numeric'
+  stackCountInput.addEventListener('change', () => {
+    state.stackCount = clamp(parseInt(stackCountInput.value, 10) || 1, 1, 20)
+    stackCountInput.value = String(state.stackCount)
+    refreshSubmitButton()
+    clearError()
+  })
+  stackCountRow.appendChild(stackCountInput)
+  stackSection.appendChild(stackCountRow)
+
+  const stackHint = document.createElement('div')
+  stackHint.className = 'text-[0.65rem] text-text-dim'
+  stackHint.textContent = 'All drops share the same time, stats, and main stat.'
+  stackSection.appendChild(stackHint)
+
+  formEl.appendChild(stackSection)
+
+  // ── Bulk section (Bulk only) ──
   const bulkSection = document.createElement('div')
   bulkSection.className = 'flex flex-col gap-2'
 
-  // Drop count input
+  // Drop count
   const countRow = document.createElement('div')
   countRow.className = 'flex items-center gap-2'
 
@@ -490,6 +561,17 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     return input
   }
 
+  function createSmallNumberInput(min: number, max: number, placeholder: string): HTMLInputElement {
+    const input = document.createElement('input')
+    input.className = 'w-12 text-center bg-surface border border-border rounded text-text px-1 py-1 text-xs transition-all placeholder:text-text-dim focus:outline-none focus:border-purple focus:ring-1 focus:ring-purple/15'
+    input.type = 'number'
+    input.min = String(min)
+    input.max = String(max)
+    input.placeholder = placeholder
+    input.inputMode = 'numeric'
+    return input
+  }
+
   function clamp(n: number, min: number, max: number) {
     return Math.max(min, Math.min(max, n))
   }
@@ -525,8 +607,8 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }
   }
 
-  function refreshSingleStatButtons() {
-    for (const [key, btn] of singleStatButtons.entries()) {
+  function refreshSharedStatButtons() {
+    for (const [key, btn] of sharedStatButtons.entries()) {
       const active = state.stats.has(key)
       btn.classList.toggle('bg-green/18', active)
       btn.classList.toggle('text-green', active)
@@ -540,14 +622,21 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   }
 
   function refreshModeVisibility() {
-    if (logMode === 'single') {
-      bulkSection.classList.add('hidden')
-      singleStatsGrid.classList.remove('hidden')
-      if (singleMainStatWrap) singleMainStatWrap.classList.remove('hidden')
+    const m = logMode
+    if (m === 'single' || m === 'stack') {
+      timeSection.classList.remove('hidden')
+      sharedStatsGrid.classList.remove('hidden')
+      if (sharedMainStatWrap) sharedMainStatWrap.classList.remove('hidden')
     } else {
-      bulkSection.classList.remove('hidden')
-      singleStatsGrid.classList.add('hidden')
-      if (singleMainStatWrap) singleMainStatWrap.classList.add('hidden')
+      timeSection.classList.add('hidden')
+      sharedStatsGrid.classList.add('hidden')
+      if (sharedMainStatWrap) sharedMainStatWrap.classList.add('hidden')
+    }
+
+    stackSection.classList.toggle('hidden', m !== 'stack')
+    bulkSection.classList.toggle('hidden', m !== 'bulk')
+
+    if (m === 'bulk') {
       rebuildBulkDropCards()
     }
     refreshSubmitButton()
@@ -556,8 +645,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   function refreshSubmitButton() {
     if (logMode === 'single') {
       submitBtn.textContent = isConsole ? 'Log Console Pull' : 'Log Rewind Pull'
-    } else {
+    } else if (logMode === 'bulk') {
       const count = state.dropCount
+      submitBtn.textContent = isConsole
+        ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
+        : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
+    } else {
+      const count = state.stackCount
       submitBtn.textContent = isConsole
         ? `Log ${count} Console Pull${count === 1 ? '' : 's'}`
         : `Log ${count} Rewind Pull${count === 1 ? '' : 's'}`
@@ -567,8 +661,7 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   function clearError() {
     errorEl.textContent = ''
     tagInput.classList.remove('border-red')
-    if (singleMainStatSelect) singleMainStatSelect.classList.remove('border-red')
-    // Also clear any bulk card error borders
+    if (sharedMainStatSelect) sharedMainStatSelect.classList.remove('border-red')
     dropsContainer.querySelectorAll('.border-red').forEach((el) => el.classList.remove('border-red'))
   }
 
@@ -577,8 +670,8 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     if (msg.toLowerCase().includes('tag')) {
       tagInput.classList.add('border-red')
     }
-    if (msg.toLowerCase().includes('main stat') && singleMainStatSelect) {
-      singleMainStatSelect.classList.add('border-red')
+    if (msg.toLowerCase().includes('main stat') && sharedMainStatSelect) {
+      sharedMainStatSelect.classList.add('border-red')
     }
     if (element) {
       element.classList.add('border-red')
@@ -614,7 +707,6 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       dropLabel.textContent = `Drop #${i + 1}`
       header.appendChild(dropLabel)
 
-      // Quick clear this drop
       const clearDropBtn = document.createElement('button')
       clearDropBtn.className = 'text-[0.6rem] text-red font-bold cursor-pointer transition-all hover:underline'
       clearDropBtn.type = 'button'
@@ -622,11 +714,57 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       clearDropBtn.addEventListener('click', () => {
         drop.stats.clear()
         drop.mainStat = null
+        drop.hour = state.hour
+        drop.minute = state.minute
+        drop.second = state.second
         rebuildBulkDropCards()
       })
       header.appendChild(clearDropBtn)
 
       card.appendChild(header)
+
+      // Time row HH:MM:SS
+      const timeWrap = document.createElement('div')
+      timeWrap.className = 'flex items-center gap-1'
+
+      const hh = createSmallNumberInput(0, 23, 'HH')
+      hh.value = pad2(drop.hour)
+      hh.addEventListener('change', () => {
+        drop.hour = clamp(parseInt(hh.value, 10) || 0, 0, 23)
+        hh.value = pad2(drop.hour)
+        clearError()
+      })
+      timeWrap.appendChild(hh)
+
+      const colon1 = document.createElement('span')
+      colon1.className = 'text-text-muted text-xs'
+      colon1.textContent = ':'
+      timeWrap.appendChild(colon1)
+
+      const mm = createSmallNumberInput(0, 59, 'MM')
+      mm.value = pad2(drop.minute)
+      mm.addEventListener('change', () => {
+        drop.minute = clamp(parseInt(mm.value, 10) || 0, 0, 59)
+        mm.value = pad2(drop.minute)
+        clearError()
+      })
+      timeWrap.appendChild(mm)
+
+      const colon2 = document.createElement('span')
+      colon2.className = 'text-text-muted text-xs'
+      colon2.textContent = ':'
+      timeWrap.appendChild(colon2)
+
+      const ss = createSmallNumberInput(0, 59, 'SS')
+      ss.value = pad2(drop.second)
+      ss.addEventListener('change', () => {
+        drop.second = clamp(parseInt(ss.value, 10) || 0, 0, 59)
+        ss.value = pad2(drop.second)
+        clearError()
+      })
+      timeWrap.appendChild(ss)
+
+      card.appendChild(timeWrap)
 
       // Main stat (Console only)
       if (isConsole) {
@@ -706,10 +844,10 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
       user_tag: userTag,
       session_id: getSessionId(),
       server_region: serverSelect.value as ServerRegion,
-      pull_hour: state.hour,
-      pull_minute: state.minute,
-      pull_second: state.second,
-      time_source: state.timeSource,
+      pull_hour: drop ? drop.hour : state.hour,
+      pull_minute: drop ? drop.minute : state.minute,
+      pull_second: (drop ? drop.second : state.second) as SecondOption,
+      time_source: drop ? 'manual' : state.timeSource,
       logged_client_at: state.clientAt || new Date().toISOString(),
       timezone_offset_minutes: state.offset,
       team_label: teamInput.value.trim() || undefined,
@@ -760,14 +898,48 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
         }
 
         state.stats.clear()
-        refreshSingleStatButtons()
+        refreshSharedStatButtons()
         notesInput.value = ''
-        if (singleMainStatSelect) {
-          singleMainStatSelect.value = ''
+        if (sharedMainStatSelect) {
+          sharedMainStatSelect.value = ''
+          state.mainStat = null
+        }
+      } else if (logMode === 'stack') {
+        if (state.stats.size === 0) {
+          showError('Select at least one substat')
+          return
+        }
+        if (isConsole && !state.mainStat) {
+          showError('Select a main stat')
+          return
+        }
+
+        const count = state.stackCount
+        if (isConsole) {
+          const base = buildPayload()
+          const payloads: ConsolePullInsertPayload[] = []
+          for (let i = 0; i < count; i++) {
+            payloads.push({ ...base, main_stat: state.mainStat! })
+          }
+          await insertConsolePullsBulk(payloads)
+        } else {
+          const base = buildPayload()
+          const payloads: PullInsertPayload[] = []
+          for (let i = 0; i < count; i++) {
+            payloads.push(base)
+          }
+          await insertPullsBulk(payloads)
+        }
+
+        state.stats.clear()
+        refreshSharedStatButtons()
+        notesInput.value = ''
+        if (sharedMainStatSelect) {
+          sharedMainStatSelect.value = ''
           state.mainStat = null
         }
       } else {
-        // Bulk mode — validate each drop
+        // Bulk mode
         const invalidIndices: number[] = []
         for (let i = 0; i < state.drops.length; i++) {
           const drop = state.drops[i]

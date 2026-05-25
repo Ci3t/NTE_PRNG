@@ -59,7 +59,7 @@ export function setPullMode(mode: PullMode): void {
 
 export function getLogMode(): LogMode {
   const val = localStorage.getItem(LOG_MODE_KEY) as LogMode | null
-  if (val === 'single' || val === 'bulk') return val
+  if (val === 'single' || val === 'bulk' || val === 'stack') return val
   return 'single'
 }
 

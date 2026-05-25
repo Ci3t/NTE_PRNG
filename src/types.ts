@@ -63,7 +63,7 @@ export const SERVER_FILTER_OPTIONS: { value: ServerRegion | 'all'; label: string
 
 export type PullMode = 'free' | 'stamina'
 
-export type LogMode = 'single' | 'bulk'
+export type LogMode = 'single' | 'bulk' | 'stack'
 
 export type ConsoleMainStat =
   | 'HP Bonus'
