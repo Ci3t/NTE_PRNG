@@ -112,6 +112,7 @@ export interface PullInsertPayload {
   timezone_offset_minutes: number
   team_label?: string
   notes?: string
+  batch_size?: number
   has_flat_hp: boolean
   has_flat_atk: boolean
   has_flat_def: boolean
@@ -138,6 +139,7 @@ export interface PullRow {
   timezone_offset_minutes: number
   team_label: string | null
   notes: string | null
+  batch_size: number
   has_flat_hp: boolean
   has_flat_atk: boolean
   has_flat_def: boolean

@@ -212,26 +212,28 @@ function buildReport(rewind: PullRow[], console: ConsolePullRow[]): string {
   report += `\n\n══════════════════════════════════════════════════════════════════\n`
   report += `  RAW DATA — REWIND PULLS (newest first)\n`
   report += `══════════════════════════════════════════════════════════════════\n\n`
-  report += `#   Date/Time(Server)    User      :SS   Server  Source  Stats\n`
+  report += `#   Date/Time(Server)    User      :SS   Server  Src   Batch  Stats\n`
   report += `──────────────────────────────────────────────────────────────────\n`
 
   for (let i = 0; i < rewind.length; i++) {
     const r = rewind[i]
     const stats = activeStats(r).join(', ')
-    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(7)} ${stats}\n`
+    const batch = r.batch_size > 1 ? `×${r.batch_size}` : 'x1'
+    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(5)} ${batch.padEnd(5)} ${stats}\n`
   }
 
   report += `\n\n══════════════════════════════════════════════════════════════════\n`
   report += `  RAW DATA — CONSOLE PULLS (newest first)\n`
   report += `══════════════════════════════════════════════════════════════════\n\n`
-  report += `#   Date/Time(Server)    User      :SS   Server  Source  Main Stat              Stats\n`
+  report += `#   Date/Time(Server)    User      :SS   Server  Src   Batch  Main Stat              Stats\n`
   report += `──────────────────────────────────────────────────────────────────\n`
 
   for (let i = 0; i < console.length; i++) {
     const r = console[i]
     const stats = activeStats(r).join(', ')
     const main = r.main_stat ?? '—'
-    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(7)} ${main.padEnd(22)} ${stats}\n`
+    const batch = r.batch_size > 1 ? `×${r.batch_size}` : 'x1'
+    report += `${String(i + 1).padEnd(3)} ${formatIso(r.created_at)}  ${r.user_tag.padEnd(9)} :${pad(r.pull_second)}   ${r.server_region.padEnd(6)} ${r.time_source.padEnd(5)} ${batch.padEnd(5)} ${main.padEnd(22)} ${stats}\n`
   }
 
   report += `\n\n══════════════════════════════════════════════════════════════════\n`

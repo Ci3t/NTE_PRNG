@@ -418,8 +418,11 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
   stackCountInput.value = '10'
   stackCountInput.inputMode = 'numeric'
   stackCountInput.addEventListener('change', () => {
-    state.stackCount = clamp(parseInt(stackCountInput.value, 10) || 1, 1, 20)
-    stackCountInput.value = String(state.stackCount)
+    const val = clamp(parseInt(stackCountInput.value, 10) || 1, 1, 20)
+    stackCountInput.value = String(val)
+    state.stackCount = val
+    initDrops(val)
+    rebuildStackDropCards()
     refreshSubmitButton()
     clearError()
   })
@@ -428,8 +431,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
 
   const stackHint = document.createElement('div')
   stackHint.className = 'text-[0.65rem] text-text-dim'
-  stackHint.textContent = 'All drops share the same time, stats, and main stat.'
+  stackHint.textContent = 'All drops share the same time and main stat. Configure sub stats per drop below.'
   stackSection.appendChild(stackHint)
+
+  // Stack drops container
+  const stackDropsContainer = document.createElement('div')
+  stackDropsContainer.className = 'flex flex-col gap-2 max-h-96 overflow-y-auto scrollbar-thin pr-1'
+  stackSection.appendChild(stackDropsContainer)
 
   formEl.appendChild(stackSection)
 
@@ -623,9 +631,13 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
 
   function refreshModeVisibility() {
     const m = logMode
-    if (m === 'single' || m === 'stack') {
+    if (m === 'single') {
       timeSection.classList.remove('hidden')
       sharedStatsGrid.classList.remove('hidden')
+      if (sharedMainStatWrap) sharedMainStatWrap.classList.remove('hidden')
+    } else if (m === 'stack') {
+      timeSection.classList.remove('hidden')
+      sharedStatsGrid.classList.add('hidden')
       if (sharedMainStatWrap) sharedMainStatWrap.classList.remove('hidden')
     } else {
       timeSection.classList.add('hidden')
@@ -636,6 +648,9 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     stackSection.classList.toggle('hidden', m !== 'stack')
     bulkSection.classList.toggle('hidden', m !== 'bulk')
 
+    if (m === 'stack') {
+      rebuildStackDropCards()
+    }
     if (m === 'bulk') {
       rebuildBulkDropCards()
     }
@@ -837,17 +852,121 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
     }
   }
 
-  function buildPayload(drop?: DropConfig): PullInsertPayload {
+  function rebuildStackDropCards() {
+    stackDropsContainer.innerHTML = ''
+
+    for (let i = 0; i < state.drops.length; i++) {
+      const drop = state.drops[i]
+
+      const card = document.createElement('div')
+      card.className = 'bg-surface-raised border border-border rounded p-2.5 flex flex-col gap-2'
+
+      // Header
+      const header = document.createElement('div')
+      header.className = 'flex items-center justify-between'
+
+      const dropLabel = document.createElement('span')
+      dropLabel.className = 'text-xs font-extrabold text-text-muted uppercase tracking-wider'
+      dropLabel.textContent = `Drop #${i + 1}`
+      header.appendChild(dropLabel)
+
+      const clearDropBtn = document.createElement('button')
+      clearDropBtn.className = 'text-[0.6rem] text-red font-bold cursor-pointer transition-all hover:underline'
+      clearDropBtn.type = 'button'
+      clearDropBtn.textContent = 'Clear'
+      clearDropBtn.addEventListener('click', () => {
+        drop.stats.clear()
+        drop.mainStat = null
+        rebuildStackDropCards()
+      })
+      header.appendChild(clearDropBtn)
+
+      card.appendChild(header)
+
+      // Main stat (Console only)
+      if (isConsole) {
+        const msWrap = document.createElement('div')
+        msWrap.className = 'flex flex-col gap-1'
+
+        const msLabel = document.createElement('div')
+        msLabel.className = 'text-[0.6rem] font-bold text-text-muted uppercase tracking-wider'
+        msLabel.textContent = 'Main Stat'
+        msWrap.appendChild(msLabel)
+
+        const msSelect = document.createElement('select')
+        msSelect.className = 'appearance-none bg-surface border border-border rounded text-text px-2 py-1.5 text-xs w-full transition-all focus:outline-none focus:border-purple focus:ring-2 focus:ring-purple/15 cursor-pointer'
+        const emptyOpt = document.createElement('option')
+        emptyOpt.value = ''
+        emptyOpt.textContent = 'Select...'
+        msSelect.appendChild(emptyOpt)
+        for (const stat of CONSOLE_MAIN_STAT_OPTIONS) {
+          const opt = document.createElement('option')
+          opt.value = stat
+          opt.textContent = stat
+          msSelect.appendChild(opt)
+        }
+        msSelect.value = drop.mainStat || ''
+        msSelect.addEventListener('change', () => {
+          drop.mainStat = msSelect.value as ConsoleMainStat || null
+          msSelect.classList.remove('border-red')
+          clearError()
+        })
+        msWrap.appendChild(msSelect)
+        card.appendChild(msWrap)
+      }
+
+      // Sub stats grid
+      const dropStatsGrid = document.createElement('div')
+      dropStatsGrid.className = 'grid grid-cols-3 gap-1'
+
+      for (const key of statKeys) {
+        const btn = document.createElement('button')
+        btn.className = 'bg-surface border border-border rounded py-1 text-[0.65rem] font-bold text-text-muted cursor-pointer transition-all hover:bg-border hover:text-text hover:-translate-y-px'
+        btn.type = 'button'
+        btn.textContent = STAT_LABELS[key]
+        const active = drop.stats.has(key)
+        if (active) {
+          btn.classList.remove('bg-surface', 'border-border', 'text-text-muted')
+          btn.classList.add('bg-green/18', 'text-green', 'border-green-dim', 'shadow-lg', 'shadow-green/15')
+        }
+        btn.addEventListener('click', () => {
+          if (drop.stats.has(key)) {
+            drop.stats.delete(key)
+          } else {
+            drop.stats.add(key)
+          }
+          const nowActive = drop.stats.has(key)
+          btn.classList.toggle('bg-green/18', nowActive)
+          btn.classList.toggle('text-green', nowActive)
+          btn.classList.toggle('border-green-dim', nowActive)
+          btn.classList.toggle('shadow-lg', nowActive)
+          btn.classList.toggle('shadow-green/15', nowActive)
+          btn.classList.toggle('bg-surface', !nowActive)
+          btn.classList.toggle('border-border', !nowActive)
+          btn.classList.toggle('text-text-muted', !nowActive)
+          clearError()
+        })
+        dropStatsGrid.appendChild(btn)
+      }
+
+      card.appendChild(dropStatsGrid)
+      stackDropsContainer.appendChild(card)
+    }
+  }
+
+  function buildPayload(drop?: DropConfig, sharedTime = false, batchSize = 1): PullInsertPayload {
     const userTag = tagInput.value.trim()
     const stats = drop ? drop.stats : state.stats
+    const useDropTime = drop && !sharedTime
     return {
       user_tag: userTag,
       session_id: getSessionId(),
       server_region: serverSelect.value as ServerRegion,
-      pull_hour: drop ? drop.hour : state.hour,
-      pull_minute: drop ? drop.minute : state.minute,
-      pull_second: (drop ? drop.second : state.second) as SecondOption,
-      time_source: drop ? 'manual' : state.timeSource,
+      pull_hour: useDropTime ? drop.hour : state.hour,
+      pull_minute: useDropTime ? drop.minute : state.minute,
+      pull_second: (useDropTime ? drop.second : state.second) as SecondOption,
+      time_source: useDropTime ? 'manual' : state.timeSource,
+      batch_size: batchSize,
       logged_client_at: state.clientAt || new Date().toISOString(),
       timezone_offset_minutes: state.offset,
       team_label: teamInput.value.trim() || undefined,
@@ -905,39 +1024,36 @@ export function mountLogForm(container: HTMLElement, props: LogFormProps, callba
           state.mainStat = null
         }
       } else if (logMode === 'stack') {
-        if (state.stats.size === 0) {
-          showError('Select at least one substat')
-          return
+        const invalidIndices: number[] = []
+        for (let i = 0; i < state.drops.length; i++) {
+          const drop = state.drops[i]
+          if (drop.stats.size === 0) invalidIndices.push(i)
+          if (isConsole && !drop.mainStat) invalidIndices.push(i)
         }
-        if (isConsole && !state.mainStat) {
-          showError('Select a main stat')
+
+        if (invalidIndices.length > 0) {
+          const unique = [...new Set(invalidIndices)].map((i) => `#${i + 1}`).join(', ')
+          showError(`Missing subs or main stat in drops ${unique}`)
           return
         }
 
-        const count = state.stackCount
         if (isConsole) {
-          const base = buildPayload()
-          const payloads: ConsolePullInsertPayload[] = []
-          for (let i = 0; i < count; i++) {
-            payloads.push({ ...base, main_stat: state.mainStat! })
-          }
+          const payloads: ConsolePullInsertPayload[] = state.drops.map((drop) => ({
+            ...buildPayload(drop, true, state.stackCount),
+            main_stat: drop.mainStat!,
+          }))
           await insertConsolePullsBulk(payloads)
         } else {
-          const base = buildPayload()
-          const payloads: PullInsertPayload[] = []
-          for (let i = 0; i < count; i++) {
-            payloads.push(base)
-          }
+          const payloads: PullInsertPayload[] = state.drops.map((drop) => buildPayload(drop, true, state.stackCount))
           await insertPullsBulk(payloads)
         }
 
-        state.stats.clear()
-        refreshSharedStatButtons()
-        notesInput.value = ''
-        if (sharedMainStatSelect) {
-          sharedMainStatSelect.value = ''
-          state.mainStat = null
+        for (const drop of state.drops) {
+          drop.stats.clear()
+          drop.mainStat = null
         }
+        rebuildStackDropCards()
+        notesInput.value = ''
       } else {
         // Bulk mode
         const invalidIndices: number[] = []
