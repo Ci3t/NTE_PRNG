@@ -442,8 +442,11 @@ function renderQuickRef(): HTMLElement {
 
 // ── Legend ────────────────────────────────────────────────
 function renderLegend(): HTMLElement {
+  const container = document.createElement('div')
+  container.className = 'flex flex-col gap-2 mb-4 px-2'
+
   const wrap = document.createElement('div')
-  wrap.className = 'flex flex-wrap items-center gap-4 mb-4 px-2 text-[10px] text-text-muted'
+  wrap.className = 'flex flex-wrap items-center gap-4 text-[10px] text-text-muted'
 
   const items: { color: string; label: string }[] = [
     { color: 'bg-green/80', label: 'HOT (DC ≥ 20%)' },
@@ -465,7 +468,28 @@ function renderLegend(): HTMLElement {
     wrap.appendChild(div)
   }
 
-  return wrap
+  const acronyms = document.createElement('div')
+  acronyms.className = 'flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-text-dim'
+  
+  const acronymText = [
+    { k: 'HE', v: 'Hour Even' },
+    { k: 'HO', v: 'Hour Odd' },
+    { k: 'ME', v: 'Minute Even' },
+    { k: 'MO', v: 'Minute Odd' },
+    { k: 'SE', v: 'Second Even' },
+    { k: 'SO', v: 'Second Odd' },
+  ]
+  
+  for (const item of acronymText) {
+    const span = document.createElement('span')
+    span.innerHTML = `<b class="text-text-muted">${item.k}</b> = ${item.v}`
+    acronyms.appendChild(span)
+  }
+
+  container.appendChild(wrap)
+  container.appendChild(acronyms)
+
+  return container
 }
 
 // ── Mount function ───────────────────────────────────────
