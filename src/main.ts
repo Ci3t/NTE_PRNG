@@ -270,14 +270,17 @@ if (!isSupabaseConfigured()) {
     }
     mountLogForm(leftPanel, { mode: currentMode }, {
       onSubmitted: () => {
-        if (currentMode === 'free') {
-          if (freeHeatMapRef) freeHeatMapRef.refresh()
-          if (freeFeedRef) freeFeedRef.refresh()
-        } else {
-          if (consoleHeatMapRef) consoleHeatMapRef.refresh()
-          if (consoleFeedRef) consoleFeedRef.refresh()
+        if (currentMode === 'free' && freeHeatMapRef && freeFeedRef) {
+          freeHeatMapRef.refresh()
+          freeFeedRef.refresh()
+        } else if (currentMode === 'stamina' && consoleHeatMapRef && consoleFeedRef) {
+          consoleHeatMapRef.refresh()
+          consoleFeedRef.refresh()
         }
-      },
+        if (analysisRef) {
+          analysisRef.refresh()
+        }
+      }
     })
   }
 
