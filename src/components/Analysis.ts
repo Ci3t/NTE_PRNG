@@ -128,15 +128,40 @@ function renderTable(table: TableDef): HTMLElement {
   const tbl = document.createElement('table')
   tbl.className = 'w-full text-xs border-collapse min-w-[800px]'
 
+  const colHighlights: boolean[] = []
+  function toggleColumn(colIdx: number) {
+    colHighlights[colIdx] = !colHighlights[colIdx]
+    const rows = tbl.querySelectorAll('tr')
+    rows.forEach(tr => {
+      const cell = tr.children[colIdx] as HTMLElement
+      if (cell) {
+        if (colHighlights[colIdx]) {
+          cell.classList.add('shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.15)]')
+        } else {
+          cell.classList.remove('shadow-[inset_0_0_0_9999px_rgba(255,255,255,0.15)]')
+        }
+      }
+    })
+  }
+
   // ── THEAD ──
   const thead = document.createElement('thead')
   const headerRow = document.createElement('tr')
+
+  let currentColIdx = 0
+
+  function addHeader(th: HTMLTableCellElement) {
+    th.classList.add('cursor-pointer', 'transition-all', 'hover:brightness-110', 'active:brightness-90', 'select-none')
+    const idx = currentColIdx++
+    th.addEventListener('click', () => toggleColumn(idx))
+    headerRow.appendChild(th)
+  }
 
   // Label col
   const thLabel = document.createElement('th')
   thLabel.className = 'sticky left-0 z-10 bg-[#00CED1] text-black font-bold text-left px-3 py-2 text-xs'
   thLabel.textContent = table.labelHeader
-  headerRow.appendChild(thLabel)
+  addHeader(thLabel)
 
   // Stat cols
   for (const sk of STAT_KEYS) {
@@ -146,25 +171,25 @@ function renderTable(table: TableDef): HTMLElement {
       ? 'bg-[#FFD700] text-black font-bold px-2 py-2 text-center text-[10px] whitespace-nowrap'
       : 'bg-surface-raised text-text-muted font-semibold px-2 py-2 text-center text-[10px] whitespace-nowrap'
     th.textContent = STAT_LABELS[sk]
-    headerRow.appendChild(th)
+    addHeader(th)
   }
 
   // DC col
   const thDC = document.createElement('th')
-  thDC.className = 'bg-red text-white font-bold px-2 py-2 text-center text-[10px]'
+  thDC.className = 'bg-purple text-white font-bold px-2 py-2 text-center text-[10px]'
   thDC.textContent = 'DC'
-  headerRow.appendChild(thDC)
+  addHeader(thDC)
 
   const thDCPct = document.createElement('th')
-  thDCPct.className = 'bg-red text-white font-bold px-2 py-2 text-center text-[10px]'
+  thDCPct.className = 'bg-purple text-white font-bold px-2 py-2 text-center text-[10px]'
   thDCPct.textContent = 'DC%'
-  headerRow.appendChild(thDCPct)
+  addHeader(thDCPct)
 
   // Total col
   const thTotal = document.createElement('th')
   thTotal.className = 'bg-surface-raised text-text font-bold px-2 py-2 text-center text-[10px]'
   thTotal.textContent = 'Total'
-  headerRow.appendChild(thTotal)
+  addHeader(thTotal)
 
   thead.appendChild(headerRow)
   tbl.appendChild(thead)
@@ -180,11 +205,11 @@ function renderTable(table: TableDef): HTMLElement {
     const isHot = dcRate >= 0.20 && row.total >= 3
 
     if (isDead) {
-      tr.className = 'bg-red/5'
+      tr.className = 'bg-red/5 hover:bg-red/20 transition-colors'
     } else if (isHot) {
-      tr.className = 'bg-green/5'
+      tr.className = 'bg-green/5 hover:bg-green/20 transition-colors'
     } else {
-      tr.className = 'hover:bg-surface-raised/50'
+      tr.className = 'hover:bg-purple/20 transition-colors'
     }
 
     // Label cell
@@ -230,7 +255,7 @@ function renderTable(table: TableDef): HTMLElement {
 
       // DC count
       const tdDC = document.createElement('td')
-      tdDC.className = 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-red'
+      tdDC.className = 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-purple-bright'
       tdDC.textContent = String(row.dc)
       tr.appendChild(tdDC)
 
@@ -241,7 +266,7 @@ function renderTable(table: TableDef): HTMLElement {
         ? 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-green'
         : isDead
           ? 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-text-dim'
-          : 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-red'
+          : 'text-center font-bold px-2 py-1.5 border-b border-border-subtle text-purple-bright'
       tdDCPct.textContent = dcPctStr
       tr.appendChild(tdDCPct)
 
@@ -289,12 +314,12 @@ function renderTable(table: TableDef): HTMLElement {
   }
 
   const tdGDC = document.createElement('td')
-  tdGDC.className = 'text-center font-bold px-2 py-2 text-red'
+  tdGDC.className = 'text-center font-bold px-2 py-2 text-purple-bright'
   tdGDC.textContent = String(grandDC)
   totalRow.appendChild(tdGDC)
 
   const tdGDCPct = document.createElement('td')
-  tdGDCPct.className = 'text-center font-bold px-2 py-2 text-red'
+  tdGDCPct.className = 'text-center font-bold px-2 py-2 text-purple-bright'
   tdGDCPct.textContent = grandTotal > 0 ? (grandDC / grandTotal * 100).toFixed(1) + '%' : '0%'
   totalRow.appendChild(tdGDCPct)
 
@@ -424,7 +449,7 @@ function renderLegend(): HTMLElement {
     { color: 'bg-green/80', label: 'HOT (DC ≥ 20%)' },
     { color: 'bg-red/80', label: 'DEAD (DC = 0%, 5+ pulls)' },
     { color: 'bg-[#FFD700]', label: 'CRIT columns' },
-    { color: 'bg-red', label: 'Dual Crit columns' },
+    { color: 'bg-purple', label: 'Dual Crit columns' },
     { color: 'bg-[#00CED1]', label: 'Row label' },
   ]
 
