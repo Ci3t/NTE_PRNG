@@ -6,6 +6,7 @@ import { mountFeed } from './components/Feed.ts'
 import { mountConsoleHeatMap } from './components/ConsoleHeatMap.ts'
 import { mountConsoleFeed } from './components/ConsoleFeed.ts'
 import { mountExportButton } from './components/DataExport.ts'
+import { mountAnalysis } from './components/Analysis.ts'
 import { getPullMode, setPullMode } from './session.ts'
 import type { PullMode, SecondOption } from './types.ts'
 
@@ -62,10 +63,13 @@ if (!isSupabaseConfigured()) {
   app.appendChild(createSetupError())
 } else {
   let currentMode: PullMode = getPullMode()
+  let currentPage: 'dashboard' | 'analysis' = 'dashboard'
+  
   let freeHeatMapRef: ReturnType<typeof mountHeatMap> | null = null
   let freeFeedRef: ReturnType<typeof mountFeed> | null = null
   let consoleHeatMapRef: ReturnType<typeof mountConsoleHeatMap> | null = null
   let consoleFeedRef: ReturnType<typeof mountConsoleFeed> | null = null
+  let analysisRef: ReturnType<typeof mountAnalysis> | null = null
 
   // Header
   const header = document.createElement('div')
@@ -78,6 +82,56 @@ if (!isSupabaseConfigured()) {
   title.className = 'font-black text-sm tracking-widest uppercase bg-gradient-to-r from-purple-bright to-gold-bright bg-clip-text text-transparent'
   title.textContent = 'NTE PRNG Logger'
   leftHeader.appendChild(title)
+
+  // Page toggle: Dashboard / Analysis
+  const pageToggle = document.createElement('div')
+  pageToggle.className = 'flex items-center gap-1 bg-surface-raised border border-border rounded p-0.5 ml-2'
+
+  const dashboardBtn = document.createElement('button')
+  dashboardBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  dashboardBtn.textContent = 'Dashboard'
+  dashboardBtn.type = 'button'
+
+  const analysisBtn = document.createElement('button')
+  analysisBtn.className = 'px-2 py-1 text-[0.65rem] font-bold rounded transition-all'
+  analysisBtn.textContent = 'Analysis'
+  analysisBtn.type = 'button'
+
+  function refreshPageButtons() {
+    const dashActive = currentPage === 'dashboard'
+    dashboardBtn.classList.toggle('bg-purple', dashActive)
+    dashboardBtn.classList.toggle('text-white', dashActive)
+    dashboardBtn.classList.toggle('shadow-sm', dashActive)
+    dashboardBtn.classList.toggle('text-text-muted', !dashActive)
+
+    analysisBtn.classList.toggle('bg-purple', !dashActive)
+    analysisBtn.classList.toggle('text-white', !dashActive)
+    analysisBtn.classList.toggle('shadow-sm', !dashActive)
+    analysisBtn.classList.toggle('text-text-muted', dashActive)
+    
+    // Hide mode toggle when on analysis page
+    modeToggle.style.display = dashActive ? 'flex' : 'none'
+  }
+
+  dashboardBtn.addEventListener('click', () => {
+    if (currentPage !== 'dashboard') {
+      currentPage = 'dashboard'
+      refreshPageButtons()
+      swapPage()
+    }
+  })
+
+  analysisBtn.addEventListener('click', () => {
+    if (currentPage !== 'analysis') {
+      currentPage = 'analysis'
+      refreshPageButtons()
+      swapPage()
+    }
+  })
+
+  pageToggle.appendChild(dashboardBtn)
+  pageToggle.appendChild(analysisBtn)
+  leftHeader.appendChild(pageToggle)
 
   // Mode toggle: Rewind / Console
   const modeToggle = document.createElement('div')
@@ -154,9 +208,14 @@ if (!isSupabaseConfigured()) {
   header.appendChild(rightHeader)
   app.appendChild(header)
 
+  // Main Content Area
+  const contentArea = document.createElement('div')
+  contentArea.className = 'flex-1 flex flex-col min-h-0 relative'
+  app.appendChild(contentArea)
+
   // Dashboard wrapper
-  const dashboard = document.createElement('div')
-  dashboard.className = 'flex-1 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden'
+  const dashboardWrapper = document.createElement('div')
+  dashboardWrapper.className = 'absolute inset-0 flex flex-col md:flex-row gap-4 p-4 min-h-0 md:overflow-hidden'
 
   const leftPanel = document.createElement('div')
   leftPanel.className = 'flex flex-col min-h-0 md:w-[400px] shrink-0 md:overflow-hidden'
@@ -164,9 +223,12 @@ if (!isSupabaseConfigured()) {
   const rightPanel = document.createElement('div')
   rightPanel.className = 'flex flex-col gap-4 flex-1 min-h-0 md:overflow-hidden'
 
-  dashboard.appendChild(leftPanel)
-  dashboard.appendChild(rightPanel)
-  app.appendChild(dashboard)
+  dashboardWrapper.appendChild(leftPanel)
+  dashboardWrapper.appendChild(rightPanel)
+
+  // Analysis wrapper
+  const analysisWrapper = document.createElement('div')
+  analysisWrapper.className = 'absolute inset-0 flex flex-col min-h-0 overflow-y-auto hidden bg-surface'
 
   // Right panel content areas
   const freeHeatmapPanel = document.createElement('div')
@@ -238,7 +300,28 @@ if (!isSupabaseConfigured()) {
     mountLogFormComponent()
   }
 
+  function swapPage() {
+    if (currentPage === 'dashboard') {
+      dashboardWrapper.classList.remove('hidden')
+      analysisWrapper.classList.add('hidden')
+    } else {
+      dashboardWrapper.classList.add('hidden')
+      analysisWrapper.classList.remove('hidden')
+      
+      if (!analysisRef) {
+        analysisRef = mountAnalysis(analysisWrapper)
+      } else {
+        analysisRef.refresh()
+      }
+    }
+  }
+
+  contentArea.appendChild(dashboardWrapper)
+  contentArea.appendChild(analysisWrapper)
+
   // Initial mount
+  refreshPageButtons()
   refreshModeButtons()
   swapDashboard()
+  swapPage()
 }
